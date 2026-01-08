@@ -17,5 +17,6 @@ assert() {
     fi
 }
 
+assert 0 0
 
 echo OK
