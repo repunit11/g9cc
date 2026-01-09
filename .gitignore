@@ -11,7 +11,7 @@
 *.o
 tmp*
 a.out
-9cc
+g9cc
 
 # Test binary, built with `go test -c`
 *.test

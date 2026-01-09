@@ -4,9 +4,12 @@ assert() {
     expected="$1"
     input="$2"
 
-    ./g9cc "$input" > tmp.s
-    gcc -o tmp tmp.s
-    ./tmp
+    tmpdir="${TMPDIR:-.tmp-work}"
+    mkdir -p "$tmpdir"
+
+    ./g9cc "$input" > "$tmpdir/tmp.s"
+    gcc -o "$tmpdir/tmp" "$tmpdir/tmp.s"
+    "$tmpdir/tmp"
     actual="$?"
 
     if [ "$actual" = "$expected" ]; then
@@ -18,5 +21,8 @@ assert() {
 }
 
 assert 0 0
+assert 42 42
+assert 21 '5+20-4'
+assert 30 '17+130-117'
 
 echo OK
