@@ -33,7 +33,7 @@ func Clean() {
 	fmt.Println("Cleaning...")
 	_ = os.Remove("g9cc")
 
-	patterns := []string{"*.o", "*~", "tmp*", "out", "out.s"}
+	patterns := []string{"*.o", "*~", "tmp*", "out", "out.s", "build"}
 	for _, pattern := range patterns {
 		matches, err := filepath.Glob(pattern)
 		if err != nil {

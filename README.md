@@ -13,25 +13,26 @@ go build -o g9cc
 ### 2. アセンブリを出力（リダイレクト）
 
 ```
-./g9cc 3 > out.s
+mkdir -p build
+./g9cc 3 > build/out.s
 ```
 
 ### 3. アセンブル + リンク
 
 ```
-gcc -no-pie -o out out.s
+gcc -no-pie -o build/out build/out.s
 ```
 
 ### 4. 実行
 
 ```
-./out
+./build/out
 ```
 
 `main` の戻り値がプロセスの終了コードになるため、結果を確認したい場合は以下のようにします。
 
 ```
-./out
+./build/out
 
 echo $?
 ```
@@ -40,3 +41,4 @@ echo $?
 
 - 引数がない場合や数値変換に失敗した場合は、エラーを標準エラーに出して終了します。
 - macOS を使っている場合は、`gcc`/`clang` のオプションが異なることがあります。
+- Go はパッケージ直下の `.s` をビルド対象として読むため、生成ファイルは `build/` に出力しています。
