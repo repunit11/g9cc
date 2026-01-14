@@ -83,7 +83,7 @@ func tokenize(s string) (*token, error) {
 			continue
 		}
 		// 記号の時トークン化
-		if s[i] == '+' || s[i] == '-' {
+		if s[i] == '+' || s[i] == '-' || s[i] == '*' || s[i] == '/' {
 			cur = newToken(tkReserved, cur, string(s[i]))
 			i++
 			continue
@@ -111,6 +111,118 @@ func tokenize(s string) (*token, error) {
 	return head.next, nil
 }
 
+type parser struct {
+	tok *token
+}
+
+type nodeKind int
+
+const (
+	ndAdd nodeKind = iota
+	ndSub
+	ndMul
+	ndDiv
+	ndNum
+)
+
+type node struct {
+	kind nodeKind
+	lhs  *node
+	rhs  *node
+	val  int
+}
+
+func newNode(kind nodeKind, lhs *node, rhs *node) *node {
+	node := &node{kind: kind, lhs: lhs, rhs: rhs}
+	return node
+}
+
+func newNodeNum(val int) *node {
+	node := &node{kind: ndNum, val: val}
+	return node
+}
+
+func (p *parser) expr() *node {
+	node := p.mul()
+	var ok bool
+
+	for {
+		ok, p.tok = consume('+', p.tok)
+		if ok {
+			node = newNode(ndAdd, node, p.mul())
+			continue
+		}
+		ok, p.tok = consume('-', p.tok)
+		if ok {
+			node = newNode(ndSub, node, p.mul())
+			continue
+		}
+		return node
+	}
+}
+
+func (p *parser) mul() *node {
+	node := p.primary()
+	var ok bool
+
+	for {
+		ok, p.tok = consume('*', p.tok)
+		if ok {
+			node = newNode(ndMul, node, p.primary())
+			continue
+		}
+		ok, p.tok = consume('/', p.tok)
+		if ok {
+			node = newNode(ndDiv, node, p.primary())
+			continue
+		}
+		return node
+	}
+}
+
+func (p *parser) primary() *node {
+	var err error
+	var num int
+	num, p.tok, err = expectNumber(p.tok)
+	if err != nil {
+		return nil
+	}
+	return newNodeNum(num)
+}
+
+func gen(node *node) {
+	if node.kind == ndNum {
+		fmt.Printf("	push %d\n", node.val)
+		return
+	}
+
+	gen(node.lhs)
+	gen(node.rhs)
+
+	fmt.Printf("	pop rdi\n")
+	fmt.Printf("	pop rax\n")
+
+	switch node.kind {
+	case ndAdd:
+		fmt.Printf("	add rax, rdi\n")
+		break
+	case ndSub:
+		fmt.Printf("	sub rax, rdi\n")
+		break
+	case ndMul:
+		fmt.Printf("	imul rax, rdi\n")
+		break
+	case ndDiv:
+		fmt.Printf("	cqo\n")
+		fmt.Printf("	idiv rdi\n")
+		break
+	default:
+		fmt.Fprintf(os.Stderr, "unexpected node kind")
+		os.Exit(1)
+	}
+	fmt.Printf("	push rax\n")
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: g9cc <integer>")
@@ -125,43 +237,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	// パースする
+	p := parser{tok: token}
+	node := p.expr()
+
 	// アセンブリの前半部分の出力
 	fmt.Printf(".intel_syntax noprefix\n")
 	fmt.Printf(".global main\n")
 	fmt.Printf("main:\n")
 
-	num, token, err := expectNumber(token)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	fmt.Printf("	mov rax, %d\n", num)
+	// ASTの生成
+	gen(node)
 
-	// トークンを消費してアセンブリを出力
-	for token.kind != tkEOF {
-		var ok bool
-		ok, token = consume('+', token)
-		if ok {
-			num, token, err = expectNumber(token)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(1)
-			}
-			fmt.Printf("	add rax, %d\n", num)
-			continue
-		}
-		ok, token = consume('-', token)
-		if ok {
-			num, token, err = expectNumber(token)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(1)
-			}
-			fmt.Printf("	sub rax, %d\n", num)
-			continue
-		}
-		fmt.Fprintln(os.Stderr, "unexpected token")
-		os.Exit(1)
-	}
+	fmt.Printf("	pop rax\n")
 	fmt.Printf("	ret\n")
 }
