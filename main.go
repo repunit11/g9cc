@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type tokenKind int
@@ -36,6 +37,17 @@ func isDigit(b byte) bool {
 	return b >= '0' && b <= '9'
 }
 
+func errorAt(input string, pos int, msg string) error {
+	if pos < 0 {
+		pos = 0
+	}
+	if pos > len(input) {
+		pos = len(input)
+	}
+	caret := strings.Repeat(" ", pos) + "^"
+	return fmt.Errorf("%s\n%s %s", input, caret, msg)
+}
+
 func consume(op uint8, token *token) (bool, *token) {
 	if token.kind != tkReserved || token.str[0] != op {
 		return false, token
@@ -46,7 +58,7 @@ func consume(op uint8, token *token) (bool, *token) {
 
 func expectNumber(token *token) (int, *token, error) {
 	if token.kind != tkNum {
-		return 0, token, fmt.Errorf("not number")
+		return 0, token, fmt.Errorf("expected a number")
 	}
 	val := token.val
 	token = token.next
@@ -92,7 +104,7 @@ func tokenize(s string) (*token, error) {
 			i = next
 			continue
 		}
-		return nil, fmt.Errorf("unexpected character: %q\n", s[i])
+		return nil, errorAt(s, i, "unexpected token")
 	}
 	// 末尾文字をつけてトークン化
 	newToken(tkEOF, cur, "")
