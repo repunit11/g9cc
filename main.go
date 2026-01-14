@@ -65,6 +65,11 @@ func tokenize(s string) (*token, error) {
 	i := 0
 
 	for i < len(s) {
+		// 空白の時スキップ
+		if s[i] == ' ' {
+			i++
+			continue
+		}
 		// 記号の時トークン化
 		if s[i] == '+' || s[i] == '-' {
 			cur = newToken(tkReserved, cur, string(s[i]))
