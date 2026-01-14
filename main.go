@@ -9,9 +9,9 @@ import (
 type tokenKind int
 
 const (
-	TK_RESERVED tokenKind = iota
-	TK_NUM
-	TK_EOF
+	tkReserved tokenKind = iota
+	tkNum
+	tkEOF
 )
 
 type token struct {
@@ -37,7 +37,7 @@ func isDigit(b byte) bool {
 }
 
 func consume(op uint8, token *token) (bool, *token) {
-	if token.kind != TK_RESERVED || token.str[0] != op {
+	if token.kind != tkReserved || token.str[0] != op {
 		return false, token
 	}
 	token = token.next
@@ -45,7 +45,7 @@ func consume(op uint8, token *token) (bool, *token) {
 }
 
 func expectNumber(token *token) (int, *token, error) {
-	if token.kind != TK_NUM {
+	if token.kind != tkNum {
 		return 0, token, fmt.Errorf("not number")
 	}
 	val := token.val
@@ -67,18 +67,18 @@ func tokenize(s string) (*token, error) {
 	for i < len(s) {
 		// 記号の時トークン化
 		if s[i] == '+' || s[i] == '-' {
-			cur = newToken(TK_RESERVED, cur, string(s[i]))
+			cur = newToken(tkReserved, cur, string(s[i]))
 			i++
 			continue
 		}
 
 		// 数字の時トークン化
-		if isDigit(byte(s[i])) {
+		if isDigit(s[i]) {
 			num, next, err := readNumber(s, i)
 			if err != nil {
 				return nil, err
 			}
-			cur = newToken(TK_NUM, cur, num)
+			cur = newToken(tkNum, cur, num)
 			val, err := strconv.Atoi(num)
 			if err != nil {
 				return nil, err
@@ -90,7 +90,7 @@ func tokenize(s string) (*token, error) {
 		return nil, fmt.Errorf("unexpected character: %q\n", s[i])
 	}
 	// 末尾文字をつけてトークン化
-	newToken(TK_EOF, cur, "")
+	newToken(tkEOF, cur, "")
 	return head.next, nil
 }
 
@@ -121,7 +121,7 @@ func main() {
 	fmt.Printf("	mov rax, %d\n", num)
 
 	// トークンを消費してアセンブリを出力
-	for token.kind != TK_EOF {
+	for token.kind != tkEOF {
 		var ok bool
 		ok, token = consume('+', token)
 		if ok {
