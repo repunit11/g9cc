@@ -1,35 +1,36 @@
 # g9cc
 
-最小の自作 C コンパイラの練習用プロジェクトです。現在は「整数を受け取って、その値を返すアセンブリ」を標準出力に生成します。
+This is a minimal self-made C compiler practice project.  
+This is the [9cc](https://github.com/rui314/9cc) version.
 
-## 使い方（ビルド → 生成 → アセンブル → 実行）
+## Usage (build -> generate -> assemble -> run)
 
-### 1. バイナリを作成
+### 1. Build the binary
 
 ```
 go build -o g9cc
 ```
 
-### 2. アセンブリを出力（リダイレクト）
+### 2. Generate assembly (redirect)
 
 ```
 mkdir -p build
 ./g9cc 3 > build/out.s
 ```
 
-### 3. アセンブル + リンク
+### 3. Assemble + link
 
 ```
 gcc -no-pie -o build/out build/out.s
 ```
 
-### 4. 実行
+### 4. Run
 
 ```
 ./build/out
 ```
 
-`main` の戻り値がプロセスの終了コードになるため、結果を確認したい場合は以下のようにします。
+The return value of `main` becomes the process exit code. To check it:
 
 ```
 ./build/out
@@ -37,8 +38,8 @@ gcc -no-pie -o build/out build/out.s
 echo $?
 ```
 
-## 補足
+## Notes
 
-- 引数がない場合や数値変換に失敗した場合は、エラーを標準エラーに出して終了します。
-- macOS を使っている場合は、`gcc`/`clang` のオプションが異なることがあります。
-- Go はパッケージ直下の `.s` をビルド対象として読むため、生成ファイルは `build/` に出力しています。
+- If no argument is provided or number conversion fails, it prints an error to stderr and exits.
+- On macOS, `gcc`/`clang` options may differ.
+- Go treats `.s` files in the package root as build targets, so generated files are written to `build/`.
