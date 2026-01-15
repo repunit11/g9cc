@@ -169,22 +169,37 @@ func (p *parser) expr() *node {
 }
 
 func (p *parser) mul() *node {
-	node := p.primary()
+	node := p.unary()
 	var ok bool
 
 	for {
 		ok, p.tok = consume('*', p.tok)
 		if ok {
-			node = newNode(ndMul, node, p.primary())
+			node = newNode(ndMul, node, p.unary())
 			continue
 		}
 		ok, p.tok = consume('/', p.tok)
 		if ok {
-			node = newNode(ndDiv, node, p.primary())
+			node = newNode(ndDiv, node, p.unary())
 			continue
 		}
 		return node
 	}
+}
+
+func (p *parser) unary() *node {
+	var ok bool
+
+	ok, p.tok = consume('+', p.tok)
+	if ok {
+		return p.primary()
+	}
+
+	ok, p.tok = consume('-', p.tok)
+	if ok {
+		return newNode(ndSub, newNodeNum(0), p.primary())
+	}
+	return p.primary()
 }
 
 func (p *parser) primary() *node {
