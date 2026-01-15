@@ -56,6 +56,13 @@ func consume(op uint8, token *token) (bool, *token) {
 	return true, token
 }
 
+func expect(op uint8, tok *token) (*token, error) {
+	if tok.kind != tkReserved || tok.str[0] != op {
+		return tok, fmt.Errorf("expected %c", op)
+	}
+	return tok.next, nil
+}
+
 func expectNumber(token *token) (int, *token, error) {
 	if token.kind != tkNum {
 		return 0, token, fmt.Errorf("expected a number")
@@ -83,7 +90,7 @@ func tokenize(s string) (*token, error) {
 			continue
 		}
 		// 記号の時トークン化
-		if s[i] == '+' || s[i] == '-' || s[i] == '*' || s[i] == '/' {
+		if s[i] == '+' || s[i] == '-' || s[i] == '*' || s[i] == '/' || s[i] == '(' || s[i] == ')' {
 			cur = newToken(tkReserved, cur, string(s[i]))
 			i++
 			continue
@@ -183,6 +190,17 @@ func (p *parser) mul() *node {
 func (p *parser) primary() *node {
 	var err error
 	var num int
+	var ok bool
+
+	ok, p.tok = consume('(', p.tok)
+	if ok {
+		node := p.expr()
+		p.tok, err = expect(')', p.tok)
+		if err != nil {
+			return nil
+		}
+		return node
+	}
 	num, p.tok, err = expectNumber(p.tok)
 	if err != nil {
 		return nil
