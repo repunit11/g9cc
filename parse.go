@@ -17,11 +17,13 @@ const (
 	ndNe
 	ndLt
 	ndLe
+	ndExprStmt
 	ndNum
 )
 
 type node struct {
 	kind nodeKind
+	next *node
 	lhs  *node
 	rhs  *node
 	val  int
@@ -60,6 +62,24 @@ func (p *parser) expectNumber() (int, error) {
 	val := p.tok.val
 	p.tok = p.tok.next
 	return val, nil
+}
+
+func (p *parser) stmt() (*node, error) {
+	return p.expr_stmt()
+}
+
+func (p *parser) expr_stmt() (*node, error) {
+	node, err := p.expr()
+	if err != nil {
+		return nil, err
+	}
+
+	node = newNode(ndExprStmt, node, nil)
+
+	if err := p.expect(";"); err != nil {
+		return nil, err
+	}
+	return node, nil
 }
 
 func (p *parser) expr() (*node, error) {
@@ -221,4 +241,19 @@ func (p *parser) primary() (*node, error) {
 		return nil, err
 	}
 	return newNodeNum(num), nil
+}
+
+func (p *parser) parse() (*node, error) {
+	head := new(node)
+	cur := head
+
+	for p.tok.kind != tkEOF {
+		n, err := p.stmt()
+		if err != nil {
+			return nil, err
+		}
+		cur.next = n
+		cur = cur.next
+	}
+	return head.next, nil
 }

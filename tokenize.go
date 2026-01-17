@@ -65,7 +65,7 @@ func tokenize(s string) (*token, error) {
 		}
 
 		// 記号の時トークン化
-		if s[i] == '+' || s[i] == '-' || s[i] == '*' || s[i] == '/' || s[i] == '(' || s[i] == ')' || s[i] == '<' || s[i] == '>' {
+		if s[i] == '+' || s[i] == '-' || s[i] == '*' || s[i] == '/' || s[i] == '(' || s[i] == ')' || s[i] == '<' || s[i] == '>' || s[i] == ';' {
 			cur = newToken(tkReserved, cur, string(s[i]), 1)
 			i++
 			continue

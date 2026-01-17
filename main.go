@@ -21,20 +21,12 @@ func main() {
 
 	// パースする
 	p := parser{tok: token}
-	node, err := p.expr()
+	node, err := p.parse()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	// アセンブリの前半部分の出力
-	fmt.Printf(".intel_syntax noprefix\n")
-	fmt.Printf(".global main\n")
-	fmt.Printf("main:\n")
-
-	// ASTの生成
-	gen(node)
-
-	fmt.Printf("	pop rax\n")
-	fmt.Printf("	ret\n")
+	// アセンブリの生成
+	codegen(node)
 }
