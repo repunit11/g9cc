@@ -6,8 +6,23 @@ import (
 )
 
 func gen_expr(node *node) {
-	if node.kind == ndNum {
+	switch node.kind {
+	case ndNum:
 		fmt.Printf("	push %d\n", node.val)
+		return
+	case ndVar:
+		gen_addr(node)
+		fmt.Printf("	pop rax\n")
+		fmt.Printf("	mov rax, [rax]\n")
+		fmt.Printf("	push rax\n")
+		return
+	case ndAssign:
+		gen_addr(node.lhs)
+		gen_expr(node.rhs)
+		fmt.Printf("	pop rdi\n")
+		fmt.Printf("	pop rax\n")
+		fmt.Printf("	mov [rax], rdi\n")
+		fmt.Printf("	push rdi\n")
 		return
 	}
 
@@ -67,21 +82,37 @@ func gen_stmt(node *node) {
 	fmt.Fprintf(os.Stderr, "invalid statement")
 }
 
+func gen_addr(node *node) {
+	if node.kind == ndVar {
+		offset := int(node.name-'a'+1) * 8
+		fmt.Printf("	mov rax, rbp\n")
+		fmt.Printf("	sub rax, %d\n", offset)
+		fmt.Printf("	push rax\n")
+		return
+	}
+
+	fmt.Fprintf(os.Stderr, "not an lvalue")
+}
+
 func codegen(node *node) {
 	// アセンブリの前半部分の出力
 	fmt.Printf(".intel_syntax noprefix\n")
 	fmt.Printf(".global main\n")
 	fmt.Printf("main:\n")
 
+	// プロローグ
+	fmt.Printf("	push rbp\n")
+	fmt.Printf("	mov rbp, rsp\n")
+	fmt.Printf("	sub rsp, 208\n") // 208 = ('z' - 'a' + 1) * 8
+
 	// ASTの生成
 	for node != nil {
 		gen_stmt(node)
-		if node.next != nil {
-			fmt.Printf("	pop rax\n")
-		}
+		fmt.Printf("	pop rax\n")
 		node = node.next
 	}
 
-	fmt.Printf("	pop rax\n")
+	fmt.Printf("	mov rsp, rbp\n")
+	fmt.Printf("	pop rbp\n")
 	fmt.Printf("	ret\n")
 }

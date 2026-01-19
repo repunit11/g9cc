@@ -8,7 +8,8 @@ import (
 type tokenKind int
 
 const (
-	tkReserved tokenKind = iota
+	tkPunct tokenKind = iota
+	tkIdent
 	tkNum
 	tkEOF
 )
@@ -58,15 +59,15 @@ func tokenize(s string) (*token, error) {
 		if i+1 < len(s) {
 			switch s[i : i+2] {
 			case "==", "!=", "<=", ">=":
-				cur = newToken(tkReserved, cur, s[i:i+2], 2)
+				cur = newToken(tkPunct, cur, s[i:i+2], 2)
 				i += 2
 				continue
 			}
 		}
 
 		// 記号の時トークン化
-		if s[i] == '+' || s[i] == '-' || s[i] == '*' || s[i] == '/' || s[i] == '(' || s[i] == ')' || s[i] == '<' || s[i] == '>' || s[i] == ';' {
-			cur = newToken(tkReserved, cur, string(s[i]), 1)
+		if s[i] == '+' || s[i] == '-' || s[i] == '*' || s[i] == '/' || s[i] == '(' || s[i] == ')' || s[i] == '<' || s[i] == '>' || s[i] == ';' || s[i] == '=' {
+			cur = newToken(tkPunct, cur, string(s[i]), 1)
 			i++
 			continue
 		}
@@ -86,6 +87,14 @@ func tokenize(s string) (*token, error) {
 			i = next
 			continue
 		}
+
+		// 1文字のローカル変数の時トークン化
+		if 'a' <= s[i] && s[i] <= 'z' {
+			cur = newToken(tkIdent, cur, string(s[i]), 1)
+			i++
+			continue
+		}
+
 		return nil, errorAt(s, i, "unexpected token")
 	}
 	// 末尾文字をつけてトークン化

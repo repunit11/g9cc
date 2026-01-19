@@ -17,16 +17,19 @@ const (
 	ndNe
 	ndLt
 	ndLe
+	ndAssign
 	ndExprStmt
+	ndVar
 	ndNum
 )
 
 type node struct {
-	kind nodeKind
-	next *node
-	lhs  *node
-	rhs  *node
-	val  int
+	kind nodeKind // nodeの種類
+	next *node    // 次のnodeのアドレス
+	lhs  *node    // 左子のnodeのアドレス
+	rhs  *node    // 右子のnodeのアドレス
+	name byte     // ndVarの時に使用
+	val  int      // ndNumの時に使用
 }
 
 func newNode(kind nodeKind, lhs *node, rhs *node) *node {
@@ -40,7 +43,7 @@ func newNodeNum(val int) *node {
 }
 
 func (p *parser) consume(op string) bool {
-	if p.tok.kind != tkReserved || len(op) != p.tok.len || p.tok.str != op {
+	if p.tok.kind != tkPunct || len(op) != p.tok.len || p.tok.str != op {
 		return false
 	}
 	p.tok = p.tok.next
@@ -48,7 +51,7 @@ func (p *parser) consume(op string) bool {
 }
 
 func (p *parser) expect(op string) error {
-	if p.tok.kind != tkReserved || len(op) != p.tok.len || p.tok.str != op {
+	if p.tok.kind != tkPunct || len(op) != p.tok.len || p.tok.str != op {
 		return fmt.Errorf("expected %q", op)
 	}
 	p.tok = p.tok.next
@@ -83,7 +86,25 @@ func (p *parser) expr_stmt() (*node, error) {
 }
 
 func (p *parser) expr() (*node, error) {
-	return p.equality()
+	return p.assign()
+}
+
+func (p *parser) assign() (*node, error) {
+	node, err := p.equality()
+	if err != nil {
+		return nil, err
+	}
+	for {
+		if p.consume("=") {
+			rhs, err := p.assign()
+			if err != nil {
+				return nil, err
+			}
+			node = newNode(ndAssign, node, rhs)
+			continue
+		}
+		return node, nil
+	}
 }
 
 func (p *parser) equality() (*node, error) {
@@ -234,6 +255,13 @@ func (p *parser) primary() (*node, error) {
 		if err := p.expect(")"); err != nil {
 			return nil, err
 		}
+		return node, nil
+	}
+
+	if p.tok.kind == tkIdent {
+		node := newNode(ndVar, nil, nil)
+		node.name = p.tok.str[0]
+		p.tok = p.tok.next
 		return node, nil
 	}
 	num, err := p.expectNumber()

@@ -47,4 +47,6 @@ assert 1 '1+2==3;'
 assert 1 '1+2<4;'
 assert 1 '-1<0;'
 assert 3 '1;2; 3;'
+assert 2 'a=2; a;'
+assert 10 'a=2; b=3+2; a*b;'
 echo OK
