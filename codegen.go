@@ -73,6 +73,7 @@ func gen_expr(node *node) {
 	fmt.Printf("	push rax\n")
 }
 
+// 文のコード生成
 func gen_stmt(node *node) {
 	if node.kind == ndExprStmt {
 		gen_expr(node.lhs)
@@ -82,6 +83,7 @@ func gen_stmt(node *node) {
 	fmt.Fprintf(os.Stderr, "invalid statement")
 }
 
+// 左辺値のアドレス生成
 func gen_addr(node *node) {
 	if node.kind == ndVar {
 		offset := int(node.name-'a'+1) * 8

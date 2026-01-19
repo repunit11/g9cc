@@ -22,6 +22,26 @@ type token struct {
 	len  int
 }
 
+var doublePunct = map[string]struct{}{
+	"==": {},
+	"!=": {},
+	"<=": {},
+	">=": {},
+}
+
+var singlePunct = map[byte]struct{}{
+	'+': {},
+	'-': {},
+	'*': {},
+	'/': {},
+	'(': {},
+	')': {},
+	'<': {},
+	'>': {},
+	';': {},
+	'=': {},
+}
+
 func readNumber(s string, i int) (string, int, error) {
 	start := i
 	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
@@ -35,6 +55,20 @@ func readNumber(s string, i int) (string, int, error) {
 
 func isDigit(b byte) bool {
 	return b >= '0' && b <= '9'
+}
+
+func isSinglePunct(b byte) bool {
+	_, ok := singlePunct[b]
+	return ok
+}
+
+func isDoublePunct(s string, i int) (string, bool) {
+	if i+1 >= len(s) {
+		return "", false
+	}
+	tok := s[i : i+2]
+	_, ok := doublePunct[tok]
+	return tok, ok
 }
 
 func newToken(kind tokenKind, cur *token, str string, len int) *token {
@@ -56,17 +90,14 @@ func tokenize(s string) (*token, error) {
 		}
 
 		// 複数文字のトークン化
-		if i+1 < len(s) {
-			switch s[i : i+2] {
-			case "==", "!=", "<=", ">=":
-				cur = newToken(tkPunct, cur, s[i:i+2], 2)
-				i += 2
-				continue
-			}
+		if tok, ok := isDoublePunct(s, i); ok {
+			cur = newToken(tkPunct, cur, tok, 2)
+			i += 2
+			continue
 		}
 
 		// 記号の時トークン化
-		if s[i] == '+' || s[i] == '-' || s[i] == '*' || s[i] == '/' || s[i] == '(' || s[i] == ')' || s[i] == '<' || s[i] == '>' || s[i] == ';' || s[i] == '=' {
+		if isSinglePunct(s[i]) {
 			cur = newToken(tkPunct, cur, string(s[i]), 1)
 			i++
 			continue

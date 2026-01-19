@@ -67,10 +67,12 @@ func (p *parser) expectNumber() (int, error) {
 	return val, nil
 }
 
+// expr = expr_stmt
 func (p *parser) stmt() (*node, error) {
 	return p.expr_stmt()
 }
 
+// expr_stmt = expr (";")*
 func (p *parser) expr_stmt() (*node, error) {
 	node, err := p.expr()
 	if err != nil {
@@ -85,10 +87,12 @@ func (p *parser) expr_stmt() (*node, error) {
 	return node, nil
 }
 
+// expr = assign
 func (p *parser) expr() (*node, error) {
 	return p.assign()
 }
 
+// assign = equality ("=" assign)*
 func (p *parser) assign() (*node, error) {
 	node, err := p.equality()
 	if err != nil {
@@ -107,6 +111,7 @@ func (p *parser) assign() (*node, error) {
 	}
 }
 
+// equality = relational ("==" relational | "!=" relational)*
 func (p *parser) equality() (*node, error) {
 	node, err := p.relational()
 	if err != nil {
@@ -134,6 +139,7 @@ func (p *parser) equality() (*node, error) {
 	}
 }
 
+// relational = add ("<" add | "<=" add | ">" add | ">=" add)*
 func (p *parser) relational() (*node, error) {
 	node, err := p.add()
 	if err != nil {
@@ -177,6 +183,7 @@ func (p *parser) relational() (*node, error) {
 	}
 }
 
+// add = mul ("+" mul | "-" mul)*
 func (p *parser) add() (*node, error) {
 	node, err := p.mul()
 	if err != nil {
@@ -204,6 +211,7 @@ func (p *parser) add() (*node, error) {
 	}
 }
 
+// mul = unary ("*" unary | "/" unary)*
 func (p *parser) mul() (*node, error) {
 	node, err := p.unary()
 	if err != nil {
@@ -231,6 +239,7 @@ func (p *parser) mul() (*node, error) {
 	}
 }
 
+// unary = ("+" | "-")? primary
 func (p *parser) unary() (*node, error) {
 	if p.consume("+") {
 		return p.primary()
@@ -246,6 +255,7 @@ func (p *parser) unary() (*node, error) {
 	return p.primary()
 }
 
+// primary = "(" expr ")" | ident | number
 func (p *parser) primary() (*node, error) {
 	if p.consume("(") {
 		node, err := p.expr()
