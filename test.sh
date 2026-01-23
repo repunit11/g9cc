@@ -49,4 +49,8 @@ assert 1 '-1<0;'
 assert 3 '1;2; 3;'
 assert 2 'a=2; a;'
 assert 10 'a=2; b=3+2; a*b;'
+assert 5 'foo=2; bar=3; foo+bar;'
+assert 5 'var1=2; var2=3; var1+var2;'
+assert 9 'ab=4; abc=5; ab+abc;'
+
 echo OK

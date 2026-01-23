@@ -86,7 +86,7 @@ func gen_stmt(node *node) {
 // 左辺値のアドレス生成
 func gen_addr(node *node) {
 	if node.kind == ndVar {
-		offset := int(node.name-'a'+1) * 8
+		offset := node.offset
 		fmt.Printf("	mov rax, rbp\n")
 		fmt.Printf("	sub rax, %d\n", offset)
 		fmt.Printf("	push rax\n")

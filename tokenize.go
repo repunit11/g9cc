@@ -71,6 +71,14 @@ func isDoublePunct(s string, i int) (string, bool) {
 	return tok, ok
 }
 
+func isIdentStart(b byte) bool {
+	return ('a' <= b && b <= 'z') || ('A' <= b && b <= 'Z') || b == '_'
+}
+
+func isIdentCont(b byte) bool {
+	return ('a' <= b && b <= 'z') || ('A' <= b && b <= 'Z') || b == '_' || ('0' <= b && b <= '9')
+}
+
 func newToken(kind tokenKind, cur *token, str string, len int) *token {
 	tok := &token{kind: kind, str: str, len: len}
 	cur.next = tok
@@ -119,10 +127,16 @@ func tokenize(s string) (*token, error) {
 			continue
 		}
 
-		// 1文字のローカル変数の時トークン化
-		if 'a' <= s[i] && s[i] <= 'z' {
-			cur = newToken(tkIdent, cur, string(s[i]), 1)
-			i++
+		// ローカル変数の時トークン化
+		if isIdentStart(s[i]) {
+			j := i
+			j++
+			for j < len(s) && isIdentCont(s[j]) {
+				j++
+			}
+			ident := s[i:j]
+			cur = newToken(tkIdent, cur, ident, len(ident))
+			i += len(ident)
 			continue
 		}
 

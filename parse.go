@@ -3,7 +3,9 @@ package main
 import "fmt"
 
 type parser struct {
-	tok *token
+	tok        *token
+	locals     *LVar
+	nextOffset int
 }
 
 type nodeKind int
@@ -24,12 +26,20 @@ const (
 )
 
 type node struct {
-	kind nodeKind // nodeの種類
-	next *node    // 次のnodeのアドレス
-	lhs  *node    // 左子のnodeのアドレス
-	rhs  *node    // 右子のnodeのアドレス
-	name byte     // ndVarの時に使用
-	val  int      // ndNumの時に使用
+	kind   nodeKind // nodeの種類
+	next   *node    // 次のnodeのアドレス
+	lhs    *node    // 左子のnodeのアドレス
+	rhs    *node    // 右子のnodeのアドレス
+	offset int      // ndVarの時に使用
+	val    int      // ndNumの時に使用
+}
+
+// 連結リストで実装しているけど、マップの方が実装は楽そう
+type LVar struct {
+	next   *LVar
+	name   string
+	len    int
+	offset int
 }
 
 func newNode(kind nodeKind, lhs *node, rhs *node) *node {
@@ -65,6 +75,17 @@ func (p *parser) expectNumber() (int, error) {
 	val := p.tok.val
 	p.tok = p.tok.next
 	return val, nil
+}
+
+func (p *parser) findLVar(name string) *LVar {
+	cur := p.locals
+	for cur != nil {
+		if cur.name == name {
+			return cur
+		}
+		cur = cur.next
+	}
+	return nil
 }
 
 // expr = expr_stmt
@@ -269,8 +290,19 @@ func (p *parser) primary() (*node, error) {
 	}
 
 	if p.tok.kind == tkIdent {
+		name := p.tok.str
+		lvar := p.findLVar(name)
+		if lvar == nil {
+			offset := p.nextOffset + 8
+			p.nextOffset = offset
+			lvar = new(LVar)
+			lvar.next = p.locals
+			lvar.name = name
+			lvar.offset = offset
+			p.locals = lvar
+		}
 		node := newNode(ndVar, nil, nil)
-		node.name = p.tok.str[0]
+		node.offset = lvar.offset
 		p.tok = p.tok.next
 		return node, nil
 	}

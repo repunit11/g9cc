@@ -20,7 +20,7 @@ func main() {
 	}
 
 	// パースする
-	p := parser{tok: token}
+	p := parser{tok: token, locals: nil, nextOffset: 0}
 	node, err := p.parse()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
