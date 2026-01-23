@@ -77,6 +77,16 @@ func gen_expr(node *node) {
 func gen_stmt(node *node) {
 	if node.kind == ndExprStmt {
 		gen_expr(node.lhs)
+		fmt.Printf("	pop rax\n")
+		return
+	}
+
+	if node.kind == ndReturn {
+		gen_expr(node.lhs)
+		fmt.Printf("	pop rax\n")
+		fmt.Printf("	mov rsp, rbp\n")
+		fmt.Printf("	pop rbp\n")
+		fmt.Printf("	ret\n")
 		return
 	}
 
@@ -110,7 +120,6 @@ func codegen(node *node) {
 	// ASTの生成
 	for node != nil {
 		gen_stmt(node)
-		fmt.Printf("	pop rax\n")
 		node = node.next
 	}
 

@@ -22,6 +22,7 @@ const (
 	ndAssign
 	ndExprStmt
 	ndVar
+	ndReturn
 	ndNum
 )
 
@@ -93,19 +94,32 @@ func (p *parser) stmt() (*node, error) {
 	return p.expr_stmt()
 }
 
-// expr_stmt = expr (";")*
+// expr_stmt = (expr ";" | return expr ";")
 func (p *parser) expr_stmt() (*node, error) {
-	node, err := p.expr()
-	if err != nil {
-		return nil, err
-	}
+	if p.tok.kind == tkReturn {
+		p.tok = p.tok.next
+		node, err := p.expr()
+		if err != nil {
+			return nil, err
+		}
+		node = newNode(ndReturn, node, nil)
 
-	node = newNode(ndExprStmt, node, nil)
+		if err := p.expect(";"); err != nil {
+			return nil, err
+		}
+		return node, nil
+	} else {
+		node, err := p.expr()
+		if err != nil {
+			return nil, err
+		}
+		node = newNode(ndExprStmt, node, nil)
 
-	if err := p.expect(";"); err != nil {
-		return nil, err
+		if err := p.expect(";"); err != nil {
+			return nil, err
+		}
+		return node, nil
 	}
-	return node, nil
 }
 
 // expr = assign

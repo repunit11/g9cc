@@ -9,6 +9,7 @@ type tokenKind int
 
 const (
 	tkPunct tokenKind = iota
+	tkReturn
 	tkIdent
 	tkNum
 	tkEOF
@@ -97,6 +98,24 @@ func tokenize(s string) (*token, error) {
 			continue
 		}
 
+		// 識別子・予約語の時トークン化
+		if isIdentStart(s[i]) {
+			j := i
+			j++
+			for j < len(s) && isIdentCont(s[j]) {
+				j++
+			}
+			ident := s[i:j]
+			kind := tkIdent
+
+			if ident == "return" {
+				kind = tkReturn
+			}
+			cur = newToken(kind, cur, ident, len(ident))
+			i += len(ident)
+			continue
+		}
+
 		// 複数文字のトークン化
 		if tok, ok := isDoublePunct(s, i); ok {
 			cur = newToken(tkPunct, cur, tok, 2)
@@ -124,19 +143,6 @@ func tokenize(s string) (*token, error) {
 			}
 			cur.val = val
 			i = next
-			continue
-		}
-
-		// ローカル変数の時トークン化
-		if isIdentStart(s[i]) {
-			j := i
-			j++
-			for j < len(s) && isIdentCont(s[j]) {
-				j++
-			}
-			ident := s[i:j]
-			cur = newToken(tkIdent, cur, ident, len(ident))
-			i += len(ident)
 			continue
 		}
 
