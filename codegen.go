@@ -5,6 +5,12 @@ import (
 	"os"
 )
 
+var cntif int
+
+func count() int {
+	cntif++
+	return cntif
+}
 func gen_expr(node *node) {
 	switch node.kind {
 	case ndNum:
@@ -87,6 +93,22 @@ func gen_stmt(node *node) {
 		fmt.Printf("	mov rsp, rbp\n")
 		fmt.Printf("	pop rbp\n")
 		fmt.Printf("	ret\n")
+		return
+	}
+
+	if node.kind == ndIf {
+		cnt := count()
+		gen_expr(node.cond)
+		fmt.Printf("	pop rax\n")
+		fmt.Printf("	cmp rax, 0\n")
+		fmt.Printf("	je .Lelse%d\n", cnt)
+		gen_stmt(node.then)
+		fmt.Printf("	jmp .Lend%d\n", cnt)
+		fmt.Printf(".Lelse%d:\n", cnt)
+		if node.els != nil {
+			gen_stmt(node.els)
+		}
+		fmt.Printf(".Lend%d:\n", cnt)
 		return
 	}
 

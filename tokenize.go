@@ -10,6 +10,8 @@ type tokenKind int
 const (
 	tkPunct tokenKind = iota
 	tkReturn
+	tkIf
+	tkElse
 	tkIdent
 	tkNum
 	tkEOF
@@ -108,8 +110,13 @@ func tokenize(s string) (*token, error) {
 			ident := s[i:j]
 			kind := tkIdent
 
-			if ident == "return" {
+			switch ident {
+			case "return":
 				kind = tkReturn
+			case "if":
+				kind = tkIf
+			case "else":
+				kind = tkElse
 			}
 			cur = newToken(kind, cur, ident, len(ident))
 			i += len(ident)

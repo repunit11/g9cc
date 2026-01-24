@@ -23,6 +23,7 @@ const (
 	ndExprStmt
 	ndVar
 	ndReturn
+	ndIf
 	ndNum
 )
 
@@ -33,6 +34,9 @@ type node struct {
 	rhs    *node    // 右子のnodeのアドレス
 	offset int      // ndVarの時に使用
 	val    int      // ndNumの時に使用
+	cond   *node    // ifの時
+	then   *node    // ifの時
+	els    *node    // ifの時
 }
 
 // 連結リストで実装しているけど、マップの方が実装は楽そう
@@ -89,12 +93,45 @@ func (p *parser) findLVar(name string) *LVar {
 	return nil
 }
 
-// expr = expr_stmt
+// stmt = expr_stmt | "if" "(" expr ")" stmt ("else" stmt)?
 func (p *parser) stmt() (*node, error) {
-	return p.expr_stmt()
+	if p.tok.kind == tkIf {
+		node := newNode(ndIf, nil, nil)
+		p.tok = p.tok.next
+
+		if err := p.expect("("); err != nil {
+			return nil, err
+		}
+		cond, err := p.expr()
+		if err != nil {
+			return nil, err
+		}
+		node.cond = cond
+		if err := p.expect(")"); err != nil {
+			return nil, err
+		}
+
+		then, err := p.stmt()
+		if err != nil {
+			return nil, err
+		}
+		node.then = then
+
+		if p.tok.kind == tkElse {
+			p.tok = p.tok.next
+			els, err := p.stmt()
+			if err != nil {
+				return nil, err
+			}
+			node.els = els
+		}
+		return node, nil
+	} else {
+		return p.expr_stmt()
+	}
 }
 
-// expr_stmt = (expr ";" | return expr ";")
+// expr_stmt = expr ";" | "return" expr ";"
 func (p *parser) expr_stmt() (*node, error) {
 	if p.tok.kind == tkReturn {
 		p.tok = p.tok.next

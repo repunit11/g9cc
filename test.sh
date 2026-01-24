@@ -55,5 +55,9 @@ assert 9 'ab=4; abc=5; ab+abc;'
 assert 2 'return 2;'
 assert 3 'a=1; return a+2;'
 assert 7 'a=5; b=2; return a+b; 9;'
+assert 2 'if (1) 2; else 3;'
+assert 3 'if (0) 2; else 3;'
+assert 7 'if (2-1) 7;'
+assert 9 'if (0) 7; 9;'
 
 echo OK
