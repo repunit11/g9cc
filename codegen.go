@@ -150,6 +150,15 @@ func genStmt(node *node) {
 		return
 	}
 
+	if node.kind == ndBlock {
+		node = node.lhs
+		for node != nil {
+			genStmt(node)
+			node = node.next
+		}
+		return
+	}
+
 	fmt.Fprintf(os.Stderr, "invalid statement")
 }
 

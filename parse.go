@@ -26,6 +26,7 @@ const (
 	ndIf
 	ndWhile
 	ndFor
+	ndBlock
 	ndNum
 )
 
@@ -103,6 +104,7 @@ func (p *parser) findLVar(name string) *LVar {
 //	| "return" expr ";"
 //	| "while" "(" expr ")" stmt
 //	| "for" "(" expr? ";" expr? ";" expr? ")" stmt
+//	| "{" stmt* "}"
 func (p *parser) stmt() (*node, error) {
 	if p.tok.kind == tkIf {
 		node := newNode(ndIf, nil, nil)
@@ -212,6 +214,22 @@ func (p *parser) stmt() (*node, error) {
 			return nil, err
 		}
 		node.then = then
+		return node, nil
+	} else if p.consume("{") {
+		head := new(node)
+		cur := head
+		for p.tok.str != "}" {
+			next, err := p.stmt()
+			if err != nil {
+				return nil, err
+			}
+			cur.next = next
+			cur = cur.next
+		}
+		if err := p.expect("}"); err != nil {
+			return nil, err
+		}
+		node := newNode(ndBlock, head.next, nil)
 		return node, nil
 	}
 	return p.exprStmt()

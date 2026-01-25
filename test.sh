@@ -65,5 +65,10 @@ assert 8 'i=0; sum=0; while((i=i+1)<5) sum=sum+2; sum;'
 assert 3 'i=0; for(i=0;i<3;i=i+1) i; return i;'
 assert 3 'i=0; for(;i<3;i=i+1) i; return i;'
 assert 3 'for(;;) return 3; return 5;'
+assert 3 '{ a=1; b=2; } a+b;'
+assert 3 'a=0; if (1) { a=3; } a;'
+assert 4 'a=0; if (0) { a=3; } else { a=4; } a;'
+assert 6 'i=0; sum=0; while(i<3) { sum=sum+2; i=i+1; } sum;'
+assert 3 'sum=0; for(i=0;i<3;i=i+1) { sum=sum+1; } sum;'
 
 echo OK
