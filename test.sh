@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
+tmpdir="${TMPDIR:-.tmp-work}"
+cat <<EOF | gcc -xc -c -o $tmpdir/tmp2.o -
+int ret3() { return 3; }
+int ret5() { return 5; }
+EOF
 
 assert() {
     expected="$1"
     input="$2"
 
-    tmpdir="${TMPDIR:-.tmp-work}"
     mkdir -p "$tmpdir"
 
     ./g9cc "$input" > "$tmpdir/tmp.s"
-    gcc -o "$tmpdir/tmp" "$tmpdir/tmp.s"
+    gcc -o "$tmpdir/tmp" "$tmpdir/tmp.s" "$tmpdir/tmp2.o"
     "$tmpdir/tmp"
     actual="$?"
 
@@ -70,5 +74,7 @@ assert 3 'a=0; if (1) { a=3; } a;'
 assert 4 'a=0; if (0) { a=3; } else { a=4; } a;'
 assert 6 'i=0; sum=0; while(i<3) { sum=sum+2; i=i+1; } sum;'
 assert 3 'sum=0; for(i=0;i<3;i=i+1) { sum=sum+1; } sum;'
+assert 3 'return ret3();'
+assert 5 '{return ret5(); }'
 
 echo OK

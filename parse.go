@@ -27,21 +27,23 @@ const (
 	ndWhile
 	ndFor
 	ndBlock
+	ndFuncall
 	ndNum
 )
 
 type node struct {
-	kind   nodeKind // nodeの種類
-	next   *node    // 次のnodeのアドレス
-	lhs    *node    // 左子のnodeのアドレス
-	rhs    *node    // 右子のnodeのアドレス
-	offset int      // ndVarの時に使用
-	val    int      // ndNumの時に使用
-	cond   *node    // if, forの時
-	then   *node    // if, forの時
-	els    *node    // ifの時
-	init   *node    // forの時
-	inc    *node    // forの時
+	kind     nodeKind // nodeの種類
+	next     *node    // 次のnodeのアドレス
+	lhs      *node    // 左子のnodeのアドレス
+	rhs      *node    // 右子のnodeのアドレス
+	offset   int      // ndVarの時に使用
+	val      int      // ndNumの時に使用
+	cond     *node    // if, forの時
+	then     *node    // if, forの時
+	els      *node    // ifの時
+	init     *node    // forの時
+	inc      *node    // forの時
+	funcname string   // 関数名
 }
 
 // LVar 連結リストで実装しているけど、マップの方が実装は楽そう
@@ -420,7 +422,7 @@ func (p *parser) unary() (*node, error) {
 	return p.primary()
 }
 
-// primary = "(" expr ")" | ident | number
+// primary = "(" expr ")" | number | ident ("(" ")")?
 func (p *parser) primary() (*node, error) {
 	if p.consume("(") {
 		node, err := p.expr()
@@ -435,6 +437,15 @@ func (p *parser) primary() (*node, error) {
 
 	if p.tok.kind == tkIdent {
 		name := p.tok.str
+		p.tok = p.tok.next
+		if p.consume("(") {
+			if err := p.expect(")"); err != nil {
+				return nil, err
+			}
+			node := newNode(ndFuncall, nil, nil)
+			node.funcname = name
+			return node, nil
+		}
 		lvar := p.findLVar(name)
 		if lvar == nil {
 			offset := p.nextOffset + 8
@@ -447,7 +458,6 @@ func (p *parser) primary() (*node, error) {
 		}
 		node := newNode(ndVar, nil, nil)
 		node.offset = lvar.offset
-		p.tok = p.tok.next
 		return node, nil
 	}
 	num, err := p.expectNumber()

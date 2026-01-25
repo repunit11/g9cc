@@ -30,6 +30,10 @@ func genExpr(node *node) {
 		fmt.Printf("	mov [rax], rdi\n")
 		fmt.Printf("	push rdi\n")
 		return
+	case ndFuncall:
+		fmt.Printf("	call %s\n", node.funcname)
+		fmt.Printf("	push rax\n")
+		return
 	}
 
 	genExpr(node.lhs)
