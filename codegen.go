@@ -112,6 +112,19 @@ func genStmt(node *node) {
 		return
 	}
 
+	if node.kind == ndWhile {
+		cnt := count()
+		fmt.Printf(".Lbegin%d:\n", cnt)
+		genExpr(node.lhs)
+		fmt.Printf("	pop rax\n")
+		fmt.Printf("	cmp rax, 0\n")
+		fmt.Printf("	je	.Lend%d\n", cnt)
+		genStmt(node.rhs)
+		fmt.Printf("	jmp	.Lbegin%d\n", cnt)
+		fmt.Printf(".Lend%d:\n", cnt)
+		return
+	}
+
 	fmt.Fprintf(os.Stderr, "invalid statement")
 }
 

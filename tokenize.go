@@ -12,6 +12,7 @@ const (
 	tkReturn
 	tkIf
 	tkElse
+	tkWhile
 	tkIdent
 	tkNum
 	tkEOF
@@ -117,6 +118,8 @@ func tokenize(s string) (*token, error) {
 				kind = tkIf
 			case "else":
 				kind = tkElse
+			case "while":
+				kind = tkWhile
 			}
 			cur = newToken(kind, cur, ident, len(ident))
 			i += len(ident)

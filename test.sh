@@ -59,5 +59,8 @@ assert 2 'if (1) 2; else 3;'
 assert 3 'if (0) 2; else 3;'
 assert 7 'if (2-1) 7;'
 assert 9 'if (0) 7; 9;'
+assert 3 'i=0; while(i<3) i=i+1; i;'
+assert 0 'i=0; while(i<0) i=i+1; i;'
+assert 8 'i=0; sum=0; while((i=i+1)<5) sum=sum+2; sum;'
 
 echo OK

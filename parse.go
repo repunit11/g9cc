@@ -24,6 +24,7 @@ const (
 	ndVar
 	ndReturn
 	ndIf
+	ndWhile
 	ndNum
 )
 
@@ -93,7 +94,11 @@ func (p *parser) findLVar(name string) *LVar {
 	return nil
 }
 
-// stmt = exprStmt | "if" "(" expr ")" stmt ("else" stmt)? | "return" expr ";"
+// stmt = exprStmt
+//
+//	| "if" "(" expr ")" stmt ("else" stmt)?
+//	| "return" expr ";"
+//	| "while" "(" expr ")" stmt
 func (p *parser) stmt() (*node, error) {
 	if p.tok.kind == tkIf {
 		node := newNode(ndIf, nil, nil)
@@ -125,6 +130,26 @@ func (p *parser) stmt() (*node, error) {
 			}
 			node.els = els
 		}
+		return node, nil
+	} else if p.tok.kind == tkWhile {
+		p.tok = p.tok.next
+
+		if err := p.expect("("); err != nil {
+			return nil, err
+		}
+		lhs, err := p.expr()
+		if err != nil {
+			return nil, err
+		}
+
+		if err := p.expect(")"); err != nil {
+			return nil, err
+		}
+		rhs, err := p.stmt()
+		if err != nil {
+			return nil, err
+		}
+		node := newNode(ndWhile, lhs, rhs)
 		return node, nil
 	} else if p.tok.kind == tkReturn {
 		p.tok = p.tok.next
