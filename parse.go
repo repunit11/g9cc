@@ -39,7 +39,7 @@ type node struct {
 	els    *node    // ifの時
 }
 
-// 連結リストで実装しているけど、マップの方が実装は楽そう
+// LVar 連結リストで実装しているけど、マップの方が実装は楽そう
 type LVar struct {
 	next   *LVar
 	name   string
@@ -93,7 +93,7 @@ func (p *parser) findLVar(name string) *LVar {
 	return nil
 }
 
-// stmt = expr_stmt | "if" "(" expr ")" stmt ("else" stmt)?
+// stmt = exprStmt | "if" "(" expr ")" stmt ("else" stmt)? | "return" expr ";"
 func (p *parser) stmt() (*node, error) {
 	if p.tok.kind == tkIf {
 		node := newNode(ndIf, nil, nil)
@@ -126,14 +126,7 @@ func (p *parser) stmt() (*node, error) {
 			node.els = els
 		}
 		return node, nil
-	} else {
-		return p.expr_stmt()
-	}
-}
-
-// expr_stmt = expr ";" | "return" expr ";"
-func (p *parser) expr_stmt() (*node, error) {
-	if p.tok.kind == tkReturn {
+	} else if p.tok.kind == tkReturn {
 		p.tok = p.tok.next
 		node, err := p.expr()
 		if err != nil {
@@ -145,18 +138,22 @@ func (p *parser) expr_stmt() (*node, error) {
 			return nil, err
 		}
 		return node, nil
-	} else {
-		node, err := p.expr()
-		if err != nil {
-			return nil, err
-		}
-		node = newNode(ndExprStmt, node, nil)
-
-		if err := p.expect(";"); err != nil {
-			return nil, err
-		}
-		return node, nil
 	}
+	return p.exprStmt()
+}
+
+// exprStmt = expr ";"
+func (p *parser) exprStmt() (*node, error) {
+	node, err := p.expr()
+	if err != nil {
+		return nil, err
+	}
+	node = newNode(ndExprStmt, node, nil)
+
+	if err := p.expect(";"); err != nil {
+		return nil, err
+	}
+	return node, nil
 }
 
 // expr = assign

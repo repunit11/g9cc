@@ -11,20 +11,20 @@ func count() int {
 	cntif++
 	return cntif
 }
-func gen_expr(node *node) {
+func genExpr(node *node) {
 	switch node.kind {
 	case ndNum:
 		fmt.Printf("	push %d\n", node.val)
 		return
 	case ndVar:
-		gen_addr(node)
+		genAddr(node)
 		fmt.Printf("	pop rax\n")
 		fmt.Printf("	mov rax, [rax]\n")
 		fmt.Printf("	push rax\n")
 		return
 	case ndAssign:
-		gen_addr(node.lhs)
-		gen_expr(node.rhs)
+		genAddr(node.lhs)
+		genExpr(node.rhs)
 		fmt.Printf("	pop rdi\n")
 		fmt.Printf("	pop rax\n")
 		fmt.Printf("	mov [rax], rdi\n")
@@ -32,8 +32,8 @@ func gen_expr(node *node) {
 		return
 	}
 
-	gen_expr(node.lhs)
-	gen_expr(node.rhs)
+	genExpr(node.lhs)
+	genExpr(node.rhs)
 
 	fmt.Printf("	pop rdi\n")
 	fmt.Printf("	pop rax\n")
@@ -80,15 +80,15 @@ func gen_expr(node *node) {
 }
 
 // 文のコード生成
-func gen_stmt(node *node) {
+func genStmt(node *node) {
 	if node.kind == ndExprStmt {
-		gen_expr(node.lhs)
+		genExpr(node.lhs)
 		fmt.Printf("	pop rax\n")
 		return
 	}
 
 	if node.kind == ndReturn {
-		gen_expr(node.lhs)
+		genExpr(node.lhs)
 		fmt.Printf("	pop rax\n")
 		fmt.Printf("	mov rsp, rbp\n")
 		fmt.Printf("	pop rbp\n")
@@ -98,15 +98,15 @@ func gen_stmt(node *node) {
 
 	if node.kind == ndIf {
 		cnt := count()
-		gen_expr(node.cond)
+		genExpr(node.cond)
 		fmt.Printf("	pop rax\n")
 		fmt.Printf("	cmp rax, 0\n")
 		fmt.Printf("	je .Lelse%d\n", cnt)
-		gen_stmt(node.then)
+		genStmt(node.then)
 		fmt.Printf("	jmp .Lend%d\n", cnt)
 		fmt.Printf(".Lelse%d:\n", cnt)
 		if node.els != nil {
-			gen_stmt(node.els)
+			genStmt(node.els)
 		}
 		fmt.Printf(".Lend%d:\n", cnt)
 		return
@@ -116,7 +116,7 @@ func gen_stmt(node *node) {
 }
 
 // 左辺値のアドレス生成
-func gen_addr(node *node) {
+func genAddr(node *node) {
 	if node.kind == ndVar {
 		offset := node.offset
 		fmt.Printf("	mov rax, rbp\n")
@@ -141,7 +141,7 @@ func codegen(node *node) {
 
 	// ASTの生成
 	for node != nil {
-		gen_stmt(node)
+		genStmt(node)
 		node = node.next
 	}
 
