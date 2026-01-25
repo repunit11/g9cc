@@ -25,6 +25,7 @@ const (
 	ndReturn
 	ndIf
 	ndWhile
+	ndFor
 	ndNum
 )
 
@@ -35,9 +36,11 @@ type node struct {
 	rhs    *node    // 右子のnodeのアドレス
 	offset int      // ndVarの時に使用
 	val    int      // ndNumの時に使用
-	cond   *node    // ifの時
-	then   *node    // ifの時
+	cond   *node    // if, forの時
+	then   *node    // if, forの時
 	els    *node    // ifの時
+	init   *node    // forの時
+	inc    *node    // forの時
 }
 
 // LVar 連結リストで実装しているけど、マップの方が実装は楽そう
@@ -99,6 +102,7 @@ func (p *parser) findLVar(name string) *LVar {
 //	| "if" "(" expr ")" stmt ("else" stmt)?
 //	| "return" expr ";"
 //	| "while" "(" expr ")" stmt
+//	| "for" "(" expr? ";" expr? ";" expr? ")" stmt
 func (p *parser) stmt() (*node, error) {
 	if p.tok.kind == tkIf {
 		node := newNode(ndIf, nil, nil)
@@ -162,6 +166,52 @@ func (p *parser) stmt() (*node, error) {
 		if err := p.expect(";"); err != nil {
 			return nil, err
 		}
+		return node, nil
+	} else if p.tok.kind == tkFor {
+		p.tok = p.tok.next
+		node := newNode(ndFor, nil, nil)
+		if err := p.expect("("); err != nil {
+			return nil, err
+		}
+
+		if p.tok.str != ";" {
+			init, err := p.expr()
+			if err != nil {
+				return nil, err
+			}
+			node.init = init
+		}
+		if err := p.expect(";"); err != nil {
+			return nil, err
+		}
+
+		if p.tok.str != ";" {
+			cond, err := p.expr()
+			if err != nil {
+				return nil, err
+			}
+			node.cond = cond
+		}
+		if err := p.expect(";"); err != nil {
+			return nil, err
+		}
+
+		if p.tok.str != ")" {
+			inc, err := p.expr()
+			if err != nil {
+				return nil, err
+			}
+			node.inc = inc
+		}
+		if err := p.expect(")"); err != nil {
+			return nil, err
+		}
+
+		then, err := p.stmt()
+		if err != nil {
+			return nil, err
+		}
+		node.then = then
 		return node, nil
 	}
 	return p.exprStmt()

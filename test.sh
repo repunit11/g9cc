@@ -62,5 +62,8 @@ assert 9 'if (0) 7; 9;'
 assert 3 'i=0; while(i<3) i=i+1; i;'
 assert 0 'i=0; while(i<0) i=i+1; i;'
 assert 8 'i=0; sum=0; while((i=i+1)<5) sum=sum+2; sum;'
+assert 3 'i=0; for(i=0;i<3;i=i+1) i; return i;'
+assert 3 'i=0; for(;i<3;i=i+1) i; return i;'
+assert 3 'for(;;) return 3; return 5;'
 
 echo OK

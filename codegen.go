@@ -125,6 +125,31 @@ func genStmt(node *node) {
 		return
 	}
 
+	if node.kind == ndFor {
+		cnt := count()
+		if node.init != nil {
+			genExpr(node.init)
+			fmt.Printf("	pop rax\n")
+		}
+		fmt.Printf(".Lbegin%d:\n", cnt)
+		if node.cond != nil {
+			genExpr(node.cond)
+			fmt.Printf("	pop rax\n")
+			fmt.Printf("	cmp rax, 0\n")
+			fmt.Printf("	je .Lend%d\n", cnt)
+		}
+		if node.then != nil {
+			genStmt(node.then)
+		}
+		if node.inc != nil {
+			genExpr(node.inc)
+			fmt.Printf("	pop rax\n")
+		}
+		fmt.Printf("	jmp .Lbegin%d\n", cnt)
+		fmt.Printf(".Lend%d:\n", cnt)
+		return
+	}
+
 	fmt.Fprintf(os.Stderr, "invalid statement")
 }
 
