@@ -106,7 +106,8 @@ func (p *parser) findLVar(name string) *LVar {
 //	| "for" "(" expr? ";" expr? ";" expr? ")" stmt
 //	| "{" stmt* "}"
 func (p *parser) stmt() (*node, error) {
-	if p.tok.kind == tkIf {
+	switch p.tok.kind {
+	case tkIf:
 		node := newNode(ndIf, nil, nil)
 		p.tok = p.tok.next
 
@@ -137,7 +138,7 @@ func (p *parser) stmt() (*node, error) {
 			node.els = els
 		}
 		return node, nil
-	} else if p.tok.kind == tkWhile {
+	case tkWhile:
 		p.tok = p.tok.next
 
 		if err := p.expect("("); err != nil {
@@ -157,7 +158,7 @@ func (p *parser) stmt() (*node, error) {
 		}
 		node := newNode(ndWhile, lhs, rhs)
 		return node, nil
-	} else if p.tok.kind == tkReturn {
+	case tkReturn:
 		p.tok = p.tok.next
 		node, err := p.expr()
 		if err != nil {
@@ -169,7 +170,7 @@ func (p *parser) stmt() (*node, error) {
 			return nil, err
 		}
 		return node, nil
-	} else if p.tok.kind == tkFor {
+	case tkFor:
 		p.tok = p.tok.next
 		node := newNode(ndFor, nil, nil)
 		if err := p.expect("("); err != nil {
@@ -215,22 +216,24 @@ func (p *parser) stmt() (*node, error) {
 		}
 		node.then = then
 		return node, nil
-	} else if p.consume("{") {
-		head := new(node)
-		cur := head
-		for p.tok.str != "}" {
-			next, err := p.stmt()
-			if err != nil {
+	case tkPunct:
+		if p.consume("{") {
+			head := new(node)
+			cur := head
+			for p.tok.str != "}" {
+				next, err := p.stmt()
+				if err != nil {
+					return nil, err
+				}
+				cur.next = next
+				cur = cur.next
+			}
+			if err := p.expect("}"); err != nil {
 				return nil, err
 			}
-			cur.next = next
-			cur = cur.next
+			node := newNode(ndBlock, head.next, nil)
+			return node, nil
 		}
-		if err := p.expect("}"); err != nil {
-			return nil, err
-		}
-		node := newNode(ndBlock, head.next, nil)
-		return node, nil
 	}
 	return p.exprStmt()
 }

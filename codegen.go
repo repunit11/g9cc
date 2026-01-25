@@ -81,22 +81,19 @@ func genExpr(node *node) {
 
 // 文のコード生成
 func genStmt(node *node) {
-	if node.kind == ndExprStmt {
+	switch node.kind {
+	case ndExprStmt:
 		genExpr(node.lhs)
 		fmt.Printf("	pop rax\n")
 		return
-	}
-
-	if node.kind == ndReturn {
+	case ndReturn:
 		genExpr(node.lhs)
 		fmt.Printf("	pop rax\n")
 		fmt.Printf("	mov rsp, rbp\n")
 		fmt.Printf("	pop rbp\n")
 		fmt.Printf("	ret\n")
 		return
-	}
-
-	if node.kind == ndIf {
+	case ndIf:
 		cnt := count()
 		genExpr(node.cond)
 		fmt.Printf("	pop rax\n")
@@ -110,9 +107,7 @@ func genStmt(node *node) {
 		}
 		fmt.Printf(".Lend%d:\n", cnt)
 		return
-	}
-
-	if node.kind == ndWhile {
+	case ndWhile:
 		cnt := count()
 		fmt.Printf(".Lbegin%d:\n", cnt)
 		genExpr(node.lhs)
@@ -123,9 +118,7 @@ func genStmt(node *node) {
 		fmt.Printf("	jmp	.Lbegin%d\n", cnt)
 		fmt.Printf(".Lend%d:\n", cnt)
 		return
-	}
-
-	if node.kind == ndFor {
+	case ndFor:
 		cnt := count()
 		if node.init != nil {
 			genExpr(node.init)
@@ -148,18 +141,17 @@ func genStmt(node *node) {
 		fmt.Printf("	jmp .Lbegin%d\n", cnt)
 		fmt.Printf(".Lend%d:\n", cnt)
 		return
-	}
-
-	if node.kind == ndBlock {
-		node = node.lhs
-		for node != nil {
-			genStmt(node)
-			node = node.next
+	case ndBlock:
+		n := node.lhs
+		for n != nil {
+			genStmt(n)
+			n = n.next
 		}
 		return
+	default:
+		fmt.Fprintf(os.Stderr, "invalid statement")
+		os.Exit(1)
 	}
-
-	fmt.Fprintf(os.Stderr, "invalid statement")
 }
 
 // 左辺値のアドレス生成
