@@ -31,7 +31,7 @@ func genExpr(node *node) {
 		fmt.Printf("	mov [rax], rdi\n")
 		fmt.Printf("	push rdi\n")
 		return
-	case ndFuncall:
+	case ndFuncall: // TODO: 関数呼び出し前にRSPを16の倍数になるようにする
 		for i := len(node.args) - 1; i >= 0; i-- {
 			genExpr(node.args[i])
 		}
@@ -165,6 +165,25 @@ func genStmt(node *node) {
 	}
 }
 
+func genFunc(funct *function) {
+	for funct != nil {
+		fmt.Printf("%s:\n", funct.name)
+
+		// プロローグ
+		fmt.Printf("	push rbp\n")
+		fmt.Printf("	mov rbp, rsp\n")
+		fmt.Printf("	sub rsp, 208\n") // 208 = ('z' - 'a' + 1) * 8
+
+		// ASTの生成
+		genStmt(funct.body)
+
+		fmt.Printf("	mov rsp, rbp\n")
+		fmt.Printf("	pop rbp\n")
+		fmt.Printf("	ret\n")
+		funct = funct.next
+	}
+}
+
 // 左辺値のアドレス生成
 func genAddr(node *node) {
 	if node.kind == ndVar {
@@ -178,24 +197,9 @@ func genAddr(node *node) {
 	fmt.Fprintf(os.Stderr, "not an lvalue")
 }
 
-func codegen(node *node) {
+func codegen(functs *function) {
 	// アセンブリの前半部分の出力
 	fmt.Printf(".intel_syntax noprefix\n")
-	fmt.Printf(".global main\n")
-	fmt.Printf("main:\n")
-
-	// プロローグ
-	fmt.Printf("	push rbp\n")
-	fmt.Printf("	mov rbp, rsp\n")
-	fmt.Printf("	sub rsp, 208\n") // 208 = ('z' - 'a' + 1) * 8
-
-	// ASTの生成
-	for node != nil {
-		genStmt(node)
-		node = node.next
-	}
-
-	fmt.Printf("	mov rsp, rbp\n")
-	fmt.Printf("	pop rbp\n")
-	fmt.Printf("	ret\n")
+	fmt.Printf("	.global main\n")
+	genFunc(functs)
 }

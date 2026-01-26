@@ -21,12 +21,12 @@ func main() {
 
 	// パースする
 	p := parser{tok: token, locals: nil, nextOffset: 0}
-	node, err := p.parse()
+	functs, err := p.parse()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
 	// アセンブリの生成
-	codegen(node)
+	codegen(functs)
 }

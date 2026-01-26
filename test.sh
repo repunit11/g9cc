@@ -14,6 +14,25 @@ assert() {
 
     mkdir -p "$tmpdir"
 
+    ./g9cc "main(){ $input }" > "$tmpdir/tmp.s"
+    gcc -o "$tmpdir/tmp" "$tmpdir/tmp.s" "$tmpdir/tmp2.o"
+    "$tmpdir/tmp"
+    actual="$?"
+
+    if [ "$actual" = "$expected" ]; then
+        echo "$input => $actual"
+    else
+        echo "$input => $expected expected, but got $actual"
+        exit 1
+    fi
+}
+
+assert_prog() {
+    expected="$1"
+    input="$2"
+
+    mkdir -p "$tmpdir"
+
     ./g9cc "$input" > "$tmpdir/tmp.s"
     gcc -o "$tmpdir/tmp" "$tmpdir/tmp.s" "$tmpdir/tmp2.o"
     "$tmpdir/tmp"
@@ -85,5 +104,7 @@ assert 2 'return sub2(5,3);'
 assert 9 'a=4; b=5; return add2(a,b);'
 assert 7 'return add3(1+1,2,3);'
 assert 6 'return add2(add2(1,2),3);'
+assert_prog 3 'foo(){ return 3; } main(){ return foo(); }'
+assert_prog 7 'foo(){ return 2; } bar(){ return 5; } main(){ return foo()+bar(); }'
 
 echo OK

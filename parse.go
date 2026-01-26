@@ -47,6 +47,13 @@ type node struct {
 	args     []*node  // 関数引数
 }
 
+type function struct {
+	name   string
+	params []*LVar
+	body   *node
+	next   *function
+}
+
 // LVar 連結リストで実装しているけど、マップの方が実装は楽そう
 type LVar struct {
 	next   *LVar
@@ -63,6 +70,16 @@ func newNode(kind nodeKind, lhs *node, rhs *node) *node {
 func newNodeNum(val int) *node {
 	node := &node{kind: ndNum, val: val}
 	return node
+}
+
+func newFunc(name string, params []*LVar, body *node, next *function) *function {
+	funct := &function{
+		name:   name,
+		params: params,
+		body:   body,
+		next:   next,
+	}
+	return funct
 }
 
 func (p *parser) consume(op string) bool {
@@ -101,6 +118,34 @@ func (p *parser) findLVar(name string) *LVar {
 	return nil
 }
 
+// funcdef = ident "(" ")" stmt
+func (p *parser) funcdef() (*function, error) {
+	p.locals = nil
+	p.nextOffset = 0
+	if p.tok.kind == tkIdent {
+		funct := newFunc(p.tok.str, nil, nil, nil)
+		p.tok = p.tok.next
+		if err := p.expect("("); err != nil {
+			return nil, err
+		}
+
+		if err := p.expect(")"); err != nil {
+			return nil, err
+		}
+
+		if p.tok.str != "{" {
+			return nil, fmt.Errorf("expected {")
+		}
+		body, err := p.stmt()
+		if err != nil {
+			return nil, err
+		}
+		funct.body = body
+		return funct, nil
+	}
+	return nil, fmt.Errorf("unexpected token")
+}
+
 // stmt = exprStmt
 //
 //	| "if" "(" expr ")" stmt ("else" stmt)?
@@ -108,6 +153,7 @@ func (p *parser) findLVar(name string) *LVar {
 //	| "while" "(" expr ")" stmt
 //	| "for" "(" expr? ";" expr? ";" expr? ")" stmt
 //	| "{" stmt* "}"
+//	| ident "(" (ident ",")? ")" "{" stmt "}"
 func (p *parser) stmt() (*node, error) {
 	switch p.tok.kind {
 	case tkIf:
@@ -483,12 +529,12 @@ func (p *parser) primary() (*node, error) {
 	return newNodeNum(num), nil
 }
 
-func (p *parser) parse() (*node, error) {
-	head := new(node)
+func (p *parser) parse() (*function, error) {
+	head := new(function)
 	cur := head
 
 	for p.tok.kind != tkEOF {
-		n, err := p.stmt()
+		n, err := p.funcdef()
 		if err != nil {
 			return nil, err
 		}
