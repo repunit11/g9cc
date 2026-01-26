@@ -3,6 +3,9 @@ tmpdir="${TMPDIR:-.tmp-work}"
 cat <<EOF | gcc -xc -c -o $tmpdir/tmp2.o -
 int ret3() { return 3; }
 int ret5() { return 5; }
+int add2(int a, int b) { return a + b; }
+int add3(int a, int b, int c) { return a + b + c; }
+int sub2(int a, int b) { return a - b; }
 EOF
 
 assert() {
@@ -76,5 +79,11 @@ assert 6 'i=0; sum=0; while(i<3) { sum=sum+2; i=i+1; } sum;'
 assert 3 'sum=0; for(i=0;i<3;i=i+1) { sum=sum+1; } sum;'
 assert 3 'return ret3();'
 assert 5 '{return ret5(); }'
+assert 5 'return add2(2,3);'
+assert 6 'return add3(1,2,3);'
+assert 2 'return sub2(5,3);'
+assert 9 'a=4; b=5; return add2(a,b);'
+assert 7 'return add3(1+1,2,3);'
+assert 6 'return add2(add2(1,2),3);'
 
 echo OK

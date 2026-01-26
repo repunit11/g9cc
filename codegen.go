@@ -6,6 +6,7 @@ import (
 )
 
 var cntif int
+var argregs = []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"}
 
 func count() int {
 	cntif++
@@ -31,6 +32,12 @@ func genExpr(node *node) {
 		fmt.Printf("	push rdi\n")
 		return
 	case ndFuncall:
+		for i := len(node.args) - 1; i >= 0; i-- {
+			genExpr(node.args[i])
+		}
+		for i := 0; i < len(node.args); i++ {
+			fmt.Printf("	pop %s\n", argregs[i])
+		}
 		fmt.Printf("	call %s\n", node.funcname)
 		fmt.Printf("	push rax\n")
 		return

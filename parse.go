@@ -44,6 +44,7 @@ type node struct {
 	init     *node    // forの時
 	inc      *node    // forの時
 	funcname string   // 関数名
+	args     []*node  // 関数引数
 }
 
 // LVar 連結リストで実装しているけど、マップの方が実装は楽そう
@@ -422,7 +423,7 @@ func (p *parser) unary() (*node, error) {
 	return p.primary()
 }
 
-// primary = "(" expr ")" | number | ident ("(" ")")?
+// primary = "(" expr ")" | number | ident ("(" (assign ("," assign)*)? ")")?
 func (p *parser) primary() (*node, error) {
 	if p.consume("(") {
 		node, err := p.expr()
@@ -439,10 +440,25 @@ func (p *parser) primary() (*node, error) {
 		name := p.tok.str
 		p.tok = p.tok.next
 		if p.consume("(") {
-			if err := p.expect(")"); err != nil {
-				return nil, err
-			}
 			node := newNode(ndFuncall, nil, nil)
+			if !p.consume(")") {
+				arg, err := p.assign()
+				if err != nil {
+					return nil, err
+				}
+				node.args = append(node.args, arg)
+				for p.consume(",") {
+					arg, err := p.assign()
+					if err != nil {
+						return nil, err
+					}
+					node.args = append(node.args, arg)
+				}
+				if err := p.expect(")"); err != nil {
+					return nil, err
+				}
+			}
+
 			node.funcname = name
 			return node, nil
 		}
