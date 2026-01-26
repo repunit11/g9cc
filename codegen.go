@@ -174,6 +174,10 @@ func genFunc(funct *function) {
 		fmt.Printf("	mov rbp, rsp\n")
 		fmt.Printf("	sub rsp, 208\n") // 208 = ('z' - 'a' + 1) * 8
 
+		for i, param := range funct.params {
+			fmt.Printf("	mov [rbp - %d], %s\n", param.offset, argregs[i])
+		}
+
 		// ASTの生成
 		genStmt(funct.body)
 
@@ -200,6 +204,7 @@ func genAddr(node *node) {
 func codegen(functs *function) {
 	// アセンブリの前半部分の出力
 	fmt.Printf(".intel_syntax noprefix\n")
-	fmt.Printf("	.global main\n")
+	fmt.Printf(".text\n")
+	fmt.Printf(".global main\n")
 	genFunc(functs)
 }

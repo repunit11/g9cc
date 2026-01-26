@@ -106,5 +106,6 @@ assert 7 'return add3(1+1,2,3);'
 assert 6 'return add2(add2(1,2),3);'
 assert_prog 3 'foo(){ return 3; } main(){ return foo(); }'
 assert_prog 7 'foo(){ return 2; } bar(){ return 5; } main(){ return foo()+bar(); }'
+assert_prog 8 'fib(n){ if (n<=1) return n; return fib(n-1)+fib(n-2); } main(){ return fib(6); }'
 
 echo OK

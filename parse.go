@@ -1,6 +1,8 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type parser struct {
 	tok        *token
@@ -118,15 +120,41 @@ func (p *parser) findLVar(name string) *LVar {
 	return nil
 }
 
-// funcdef = ident "(" ")" stmt
+// funcdef = ident "(" ( ident ("," ident)*)? ")" stmt
 func (p *parser) funcdef() (*function, error) {
 	p.locals = nil
 	p.nextOffset = 0
 	if p.tok.kind == tkIdent {
-		funct := newFunc(p.tok.str, nil, nil, nil)
+		params := []*LVar{}
+		funct := newFunc(p.tok.str, params, nil, nil)
 		p.tok = p.tok.next
 		if err := p.expect("("); err != nil {
 			return nil, err
+		}
+
+		if p.tok.kind == tkIdent {
+			for {
+				if p.tok.kind != tkIdent {
+					return nil, fmt.Errorf("expected ident")
+				}
+				tok := p.tok
+				p.tok = p.tok.next
+
+				p.nextOffset += 8
+				lvar := &LVar{
+					name:   tok.str,
+					len:    tok.len,
+					offset: p.nextOffset,
+					next:   p.locals,
+				}
+				p.locals = lvar
+				params = append(params, lvar)
+
+				if !p.consume(",") {
+					break
+				}
+			}
+			funct.params = params
 		}
 
 		if err := p.expect(")"); err != nil {
