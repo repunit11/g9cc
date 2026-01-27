@@ -87,10 +87,69 @@ func isIdentCont(b byte) bool {
 	return ('a' <= b && b <= 'z') || ('A' <= b && b <= 'Z') || b == '_' || ('0' <= b && b <= '9')
 }
 
-func newToken(kind tokenKind, cur *token, str string, len int) *token {
-	tok := &token{kind: kind, str: str, len: len}
-	cur.next = tok
-	return tok
+func scanIdentOrKeyword(s string, i int) (*token, int, bool) {
+	if !isIdentStart(s[i]) {
+		return nil, i, false
+	}
+	j := i + 1
+	for j < len(s) && isIdentCont(s[j]) {
+		j++
+	}
+	ident := s[i:j]
+	kind := tkIdent
+
+	switch ident {
+	case "return":
+		kind = tkReturn
+	case "if":
+		kind = tkIf
+	case "else":
+		kind = tkElse
+	case "while":
+		kind = tkWhile
+	case "for":
+		kind = tkFor
+	}
+	return newToken(kind, ident, len(ident)), j, true
+}
+
+func scanDoublePunct(s string, i int) (*token, int, bool) {
+	val, ok := isDoublePunct(s, i)
+	if !ok {
+		return nil, i, ok
+	}
+	j := i + 2
+	return newToken(tkPunct, val, len(val)), j, ok
+}
+
+func scanSinglePunct(s string, i int) (*token, int, bool) {
+	ok := isSinglePunct(s[i])
+	if !ok {
+		return nil, i, ok
+	}
+	j := i + 1
+	return newToken(tkPunct, string(s[i]), 1), j, ok
+}
+
+func scanNumber(s string, i int) (*token, int, bool, error) {
+	if !isDigit(s[i]) {
+		return nil, i, false, nil
+	}
+	num, next, err := readNumber(s, i)
+	if err != nil {
+		return nil, i, false, err
+	}
+	val, err := strconv.Atoi(num)
+	if err != nil {
+		return nil, i, false, err
+	}
+	tok := newToken(tkNum, num, 1)
+	tok.val = val
+	return tok, next, true, nil
+}
+
+func newToken(kind tokenKind, str string, len int) *token {
+	return &token{kind: kind, str: str, len: len}
 }
 
 func tokenize(s string) (*token, error) {
@@ -106,58 +165,35 @@ func tokenize(s string) (*token, error) {
 		}
 
 		// 識別子・予約語の時トークン化
-		if isIdentStart(s[i]) {
-			j := i
-			j++
-			for j < len(s) && isIdentCont(s[j]) {
-				j++
-			}
-			ident := s[i:j]
-			kind := tkIdent
-
-			switch ident {
-			case "return":
-				kind = tkReturn
-			case "if":
-				kind = tkIf
-			case "else":
-				kind = tkElse
-			case "while":
-				kind = tkWhile
-			case "for":
-				kind = tkFor
-			}
-			cur = newToken(kind, cur, ident, len(ident))
-			i += len(ident)
+		if tok, next, ok := scanIdentOrKeyword(s, i); ok {
+			cur.next = tok
+			cur = tok
+			i = next
 			continue
 		}
 
 		// 複数文字のトークン化
-		if tok, ok := isDoublePunct(s, i); ok {
-			cur = newToken(tkPunct, cur, tok, 2)
-			i += 2
+		if tok, next, ok := scanDoublePunct(s, i); ok {
+			cur.next = tok
+			cur = tok
+			i = next
 			continue
 		}
 
 		// 記号の時トークン化
-		if isSinglePunct(s[i]) {
-			cur = newToken(tkPunct, cur, string(s[i]), 1)
-			i++
+		if tok, next, ok := scanSinglePunct(s, i); ok {
+			cur.next = tok
+			cur = tok
+			i = next
 			continue
 		}
 
 		// 数字の時トークン化
-		if isDigit(s[i]) {
-			num, next, err := readNumber(s, i)
-			if err != nil {
-				return nil, err
-			}
-			cur = newToken(tkNum, cur, num, 1)
-			val, err := strconv.Atoi(num)
-			if err != nil {
-				return nil, err
-			}
-			cur.val = val
+		if tok, next, ok, err := scanNumber(s, i); err != nil {
+			return nil, err
+		} else if ok {
+			cur.next = tok
+			cur = tok
 			i = next
 			continue
 		}
@@ -165,6 +201,6 @@ func tokenize(s string) (*token, error) {
 		return nil, errorAt(s, i, "unexpected token")
 	}
 	// 末尾文字をつけてトークン化
-	newToken(tkEOF, cur, "", 0)
+	cur.next = newToken(tkEOF, "", 0)
 	return head.next, nil
 }
