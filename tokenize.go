@@ -123,13 +123,13 @@ func scanDoublePunct(s string, i int) (*token, int, bool) {
 	return newToken(tkPunct, val, len(val)), j, ok
 }
 
-func scanSinglePunct(s string, i int) (*token, int, bool) {
+func scanSinglePunct(s string, i int) (string, int, bool) {
 	ok := isSinglePunct(s[i])
 	if !ok {
-		return nil, i, ok
+		return "", i, ok
 	}
 	j := i + 1
-	return newToken(tkPunct, string(s[i]), 1), j, ok
+	return string(s[i]), j, ok
 }
 
 func scanNumber(s string, i int) (*token, int, bool, error) {
@@ -167,6 +167,9 @@ func tokenize(s string) (*token, error) {
 
 		// 識別子・予約語の時トークン化
 		if tok, next, ok := scanIdentOrKeyword(s, i); ok {
+			if tok == nil {
+				return nil, fmt.Errorf("internal error: nil token")
+			}
 			cur.next = tok
 			cur = tok
 			i = next
@@ -175,6 +178,9 @@ func tokenize(s string) (*token, error) {
 
 		// 複数文字のトークン化
 		if tok, next, ok := scanDoublePunct(s, i); ok {
+			if tok == nil {
+				return nil, fmt.Errorf("internal error: nil token")
+			}
 			cur.next = tok
 			cur = tok
 			i = next
@@ -182,7 +188,8 @@ func tokenize(s string) (*token, error) {
 		}
 
 		// 記号の時トークン化
-		if tok, next, ok := scanSinglePunct(s, i); ok {
+		if punct, next, ok := scanSinglePunct(s, i); ok {
+			tok := newToken(tkPunct, punct, 1)
 			cur.next = tok
 			cur = tok
 			i = next
@@ -193,6 +200,9 @@ func tokenize(s string) (*token, error) {
 		if tok, next, ok, err := scanNumber(s, i); err != nil {
 			return nil, err
 		} else if ok {
+			if tok == nil {
+				return nil, fmt.Errorf("internal error: nil token")
+			}
 			cur.next = tok
 			cur = tok
 			i = next
