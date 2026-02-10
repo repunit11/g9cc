@@ -30,6 +30,8 @@ const (
 	ndFor
 	ndBlock
 	ndFuncall
+	ndAddr
+	ndDeref
 	ndNum
 )
 
@@ -481,18 +483,36 @@ func (p *parser) mul() (*node, error) {
 	}
 }
 
-// unary = ("+" | "-")? primary
+// unary = ("+" | "-")? unary() | "*" unary | "&" unary
 func (p *parser) unary() (*node, error) {
 	if p.consume("+") {
-		return p.primary()
+		return p.unary()
 	}
 
 	if p.consume("-") {
-		prim, err := p.primary()
+		prim, err := p.unary()
 		if err != nil {
 			return nil, err
 		}
 		return newNode(ndSub, newNodeNum(0), prim), nil
+	}
+
+	if p.consume("*") {
+		node, err := p.unary()
+		if err != nil {
+			return nil, err
+		}
+		node = newNode(ndDeref, node, nil)
+		return node, nil
+	}
+
+	if p.consume("&") {
+		node, err := p.unary()
+		if err != nil {
+			return nil, err
+		}
+		node = newNode(ndAddr, node, nil)
+		return node, nil
 	}
 	return p.primary()
 }

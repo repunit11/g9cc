@@ -41,6 +41,15 @@ func genExpr(node *node) {
 		fmt.Printf("	call %s\n", node.funcname)
 		fmt.Printf("	push rax\n")
 		return
+	case ndAddr:
+		genAddr(node.lhs)
+		return
+	case ndDeref:
+		genExpr(node.lhs)
+		fmt.Printf("	pop rax\n")
+		fmt.Printf("	mov rax, [rax]\n")
+		fmt.Printf("	push rax\n")
+		return
 	}
 
 	genExpr(node.lhs)
@@ -190,11 +199,15 @@ func genFunc(funct *function) {
 
 // 左辺値のアドレス生成
 func genAddr(node *node) {
-	if node.kind == ndVar {
+	switch node.kind {
+	case ndVar:
 		offset := node.offset
 		fmt.Printf("	mov rax, rbp\n")
 		fmt.Printf("	sub rax, %d\n", offset)
 		fmt.Printf("	push rax\n")
+		return
+	case ndDeref:
+		genExpr(node.lhs)
 		return
 	}
 
