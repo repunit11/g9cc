@@ -35,6 +35,10 @@ func genExpr(node *node) {
 		for i := len(node.args) - 1; i >= 0; i-- {
 			genExpr(node.args[i])
 		}
+		if len(node.args) > len(argregs) {
+			fmt.Fprintf(os.Stderr, "too many arguments: max %d\n", len(argregs))
+			os.Exit(1)
+		}
 		for i := 0; i < len(node.args); i++ {
 			fmt.Printf("	pop %s\n", argregs[i])
 		}

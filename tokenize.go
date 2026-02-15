@@ -15,6 +15,7 @@ const (
 	tkWhile
 	tkFor
 	tkIdent
+	tkInt
 	tkNum
 	tkEOF
 )
@@ -110,6 +111,8 @@ func scanIdentOrKeyword(s string, i int) (*token, int, bool) {
 		kind = tkWhile
 	case "for":
 		kind = tkFor
+	case "int":
+		kind = tkInt
 	}
 	return newToken(kind, ident, len(ident)), j, true
 }

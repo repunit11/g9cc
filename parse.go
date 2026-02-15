@@ -122,8 +122,12 @@ func (p *parser) findLVar(name string) *LVar {
 	return nil
 }
 
-// funcdef = ident "(" ( ident ("," ident)*)? ")" stmt
+// funcdef = declspec ident "(" ( declspec ident ("," declspec ident)*)? ")" stmt
 func (p *parser) funcdef() (*function, error) {
+	if err := p.declspec(); err != nil {
+		return nil, err
+	}
+
 	p.locals = nil
 	p.nextOffset = 0
 	if p.tok.kind == tkIdent {
@@ -134,22 +138,32 @@ func (p *parser) funcdef() (*function, error) {
 			return nil, err
 		}
 
-		if p.tok.kind == tkIdent {
+		if p.tok.str != ")" {
 			for {
+				if err := p.declspec(); err != nil {
+					return nil, err
+				}
 				if p.tok.kind != tkIdent {
 					return nil, fmt.Errorf("expected ident")
 				}
 				tok := p.tok
 				p.tok = p.tok.next
 
+				lvar := p.findLVar(tok.str)
+				if lvar != nil {
+					return nil, fmt.Errorf("%s is already defined", tok.str)
+				}
 				p.nextOffset += 8
-				lvar := &LVar{
+				lvar = &LVar{
 					name:   tok.str,
 					len:    tok.len,
 					offset: p.nextOffset,
 					next:   p.locals,
 				}
 				p.locals = lvar
+				if len(params) >= len(argregs) {
+					return nil, fmt.Errorf("too many parameters: max %d", len(argregs))
+				}
 				params = append(params, lvar)
 
 				if !p.consume(",") {
@@ -313,8 +327,51 @@ func (p *parser) stmt() (*node, error) {
 			node := newNode(ndBlock, head.next, nil)
 			return node, nil
 		}
+	case tkInt:
+		return p.declaration()
 	}
 	return p.exprStmt()
+}
+
+// declspec = "int"
+func (p *parser) declspec() error {
+	if p.tok.kind != tkInt {
+		return fmt.Errorf("expected type specifier 'int'")
+	}
+	p.tok = p.tok.next
+	return nil
+}
+
+// declspec ident ";"
+func (p *parser) declaration() (*node, error) {
+	if err := p.declspec(); err != nil {
+		return nil, err
+	}
+
+	if p.tok.kind != tkIdent {
+		return nil, fmt.Errorf("expected ident")
+	}
+	tok := p.tok
+	p.tok = p.tok.next
+
+	lvar := p.findLVar(tok.str)
+	if lvar != nil {
+		return nil, fmt.Errorf("%s is already defined", tok.str)
+	}
+	p.nextOffset += 8
+	lvar = &LVar{
+		next:   p.locals,
+		name:   tok.str,
+		len:    tok.len,
+		offset: p.nextOffset,
+	}
+	p.locals = lvar
+
+	if err := p.expect(";"); err != nil {
+		return nil, err
+	}
+
+	return newNode(ndBlock, nil, nil), nil
 }
 
 // exprStmt = expr ";"
@@ -558,13 +615,7 @@ func (p *parser) primary() (*node, error) {
 		}
 		lvar := p.findLVar(name)
 		if lvar == nil {
-			offset := p.nextOffset + 8
-			p.nextOffset = offset
-			lvar = new(LVar)
-			lvar.next = p.locals
-			lvar.name = name
-			lvar.offset = offset
-			p.locals = lvar
+			return nil, fmt.Errorf("undefined variable: %s", name)
 		}
 		node := newNode(ndVar, nil, nil)
 		node.offset = lvar.offset
