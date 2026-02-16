@@ -46,10 +46,12 @@ assert_prog() {
     fi
 }
 
+assert_prog 3 'int main() {int x;int *y;y = &x;*y = 3;return x;}'
 assert_prog 0 'int main(){ return 0; }'
 assert_prog 3 'int id(int x){ return x; } int main(){ return id(3); }'
 assert_prog 5 'int add(int x, int y){ return x+y; } int main(){ return add(2,3); }'
 assert_prog 3 'int main(){ int x; x=3; return x; }'
+assert 7 '{ int x; x=3; int y;y=5; *(&y+2-1)=7; return x; }'
 assert 8 '{ int x; x=3; int y; y=5; x=x+y; return x; }'
 assert 0 '0;'
 assert 42 '42;'
@@ -111,8 +113,8 @@ assert 7 'return add3(1+1,2,3);'
 assert 6 'return add2(add2(1,2),3);'
 assert 3 'int a; int b; a=3; b=&a; return *b;'
 assert 5 'int x; int y; x=3; y=&x; *y=5; return x;'
-assert 7 'int x; int y; x=3; y=5; *(&x-8)=7; return y;'
-assert 7 'int x; int y; x=3; y=5; *(&y+8)=7; return x;'
+assert 7 'int x; int y; x=3; y=5; *(&x-1)=7; return y;'
+assert 7 'int x; int y; x=3; y=5; *(&y+1)=7; return x;'
 assert_prog 3 'int foo(){ return 3; } int main(){ return foo(); }'
 assert_prog 7 'int foo(){ return 2; } int bar(){ return 5; } int main(){ return foo()+bar(); }'
 assert_prog 8 'int fib(int n){ if (n<=1) return n; return fib(n-1)+fib(n-2); } int main(){ return fib(6); }'

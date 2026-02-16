@@ -40,7 +40,7 @@ type node struct {
 	next     *node    // 次のnodeのアドレス
 	lhs      *node    // 左子のnodeのアドレス
 	rhs      *node    // 右子のnodeのアドレス
-	offset   int      // ndVarの時に使用
+	lvar     *LVar    // ndVarの時に使用
 	val      int      // ndNumの時に使用
 	cond     *node    // if, forの時
 	then     *node    // if, forの時
@@ -49,6 +49,7 @@ type node struct {
 	inc      *node    // forの時
 	funcname string   // 関数名
 	args     []*node  // 関数引数
+	ty       *ty      // ポインタを表す型
 }
 
 type function struct {
@@ -64,6 +65,7 @@ type LVar struct {
 	name   string
 	len    int
 	offset int
+	ty     *ty
 }
 
 func newNode(kind nodeKind, lhs *node, rhs *node) *node {
@@ -124,7 +126,7 @@ func (p *parser) findLVar(name string) *LVar {
 
 // funcdef = declspec ident "(" ( declspec ident ("," declspec ident)*)? ")" stmt
 func (p *parser) funcdef() (*function, error) {
-	if err := p.declspec(); err != nil {
+	if _, err := p.declspec(); err != nil {
 		return nil, err
 	}
 
@@ -140,7 +142,8 @@ func (p *parser) funcdef() (*function, error) {
 
 		if p.tok.str != ")" {
 			for {
-				if err := p.declspec(); err != nil {
+				ty, err := p.declspec()
+				if err != nil {
 					return nil, err
 				}
 				if p.tok.kind != tkIdent {
@@ -159,6 +162,7 @@ func (p *parser) funcdef() (*function, error) {
 					len:    tok.len,
 					offset: p.nextOffset,
 					next:   p.locals,
+					ty:     ty,
 				}
 				p.locals = lvar
 				if len(params) >= len(argregs) {
@@ -334,25 +338,40 @@ func (p *parser) stmt() (*node, error) {
 }
 
 // declspec = "int"
-func (p *parser) declspec() error {
+func (p *parser) declspec() (*ty, error) {
 	if p.tok.kind != tkInt {
-		return fmt.Errorf("expected type specifier 'int'")
+		return nil, fmt.Errorf("expected type specifier 'int'")
 	}
 	p.tok = p.tok.next
-	return nil
+	return &ty{kind: tyInt}, nil
 }
 
-// declspec ident ";"
-func (p *parser) declaration() (*node, error) {
-	if err := p.declspec(); err != nil {
-		return nil, err
+// declarator = "*"* ident
+func (p *parser) declarator(ty *ty) (*ty, *token, error) {
+	for p.consume("*") {
+		ty = pointerTo(ty)
 	}
 
 	if p.tok.kind != tkIdent {
-		return nil, fmt.Errorf("expected ident")
+		return nil, nil, fmt.Errorf("expected a variable name")
 	}
+
 	tok := p.tok
 	p.tok = p.tok.next
+	return ty, tok, nil
+}
+
+// declaration = declspec declarator ";"
+func (p *parser) declaration() (*node, error) {
+	ty, err := p.declspec()
+	if err != nil {
+		return nil, err
+	}
+
+	ty, tok, err := p.declarator(ty)
+	if err != nil {
+		return nil, err
+	}
 
 	lvar := p.findLVar(tok.str)
 	if lvar != nil {
@@ -364,6 +383,7 @@ func (p *parser) declaration() (*node, error) {
 		name:   tok.str,
 		len:    tok.len,
 		offset: p.nextOffset,
+		ty:     ty,
 	}
 	p.locals = lvar
 
@@ -484,6 +504,63 @@ func (p *parser) relational() (*node, error) {
 	}
 }
 
+func (p *parser) newAdd(lhs *node, rhs *node) (*node, error) {
+	addType(lhs)
+	addType(rhs)
+	if lhs.ty == nil || rhs.ty == nil {
+		return nil, fmt.Errorf("internal error: missing type in '+'")
+	}
+
+	// num + num
+	if lhs.ty.kind == tyInt && rhs.ty.kind == tyInt {
+		return newNode(ndAdd, lhs, rhs), nil
+	}
+
+	// num + ptr to ptr + num
+	if lhs.ty.kind == tyInt && rhs.ty.kind == tyPtr {
+		lhs, rhs = rhs, lhs
+	}
+
+	// ptr + num
+	if lhs.ty.kind == tyPtr && rhs.ty.kind == tyInt {
+		rhs = newNode(ndMul, rhs, newNodeNum(8))
+		return newNode(ndAdd, lhs, rhs), nil
+	}
+
+	return nil, fmt.Errorf("invalid operands for +")
+}
+
+func (p *parser) newSub(lhs *node, rhs *node) (*node, error) {
+	addType(lhs)
+	addType(rhs)
+	if lhs.ty == nil || rhs.ty == nil {
+		return nil, fmt.Errorf("internal error: missing type in '-'")
+	}
+
+	// num - num
+	if lhs.ty.kind == tyInt && rhs.ty.kind == tyInt {
+		return newNode(ndSub, lhs, rhs), nil
+	}
+
+	// ptr - num
+	if lhs.ty.kind == tyPtr && rhs.ty.kind == tyInt {
+		rhs = newNode(ndMul, rhs, newNodeNum(8))
+		addType(rhs)
+		node := newNode(ndSub, lhs, rhs)
+		node.ty = lhs.ty
+		return node, nil
+	}
+
+	// ptr - ptr
+	if lhs.ty.kind == tyPtr && rhs.ty.kind == tyPtr {
+		node := newNode(ndSub, lhs, rhs)
+		node.ty = &ty{kind: tyInt}
+		return newNode(ndDiv, node, newNodeNum(8)), nil
+	}
+
+	return nil, fmt.Errorf("invalid operands for -")
+}
+
 // add = mul ("+" mul | "-" mul)*
 func (p *parser) add() (*node, error) {
 	node, err := p.mul()
@@ -497,7 +574,10 @@ func (p *parser) add() (*node, error) {
 			if err != nil {
 				return nil, err
 			}
-			node = newNode(ndAdd, node, rhs)
+			node, err = p.newAdd(node, rhs)
+			if err != nil {
+				return nil, err
+			}
 			continue
 		}
 		if p.consume("-") {
@@ -505,7 +585,10 @@ func (p *parser) add() (*node, error) {
 			if err != nil {
 				return nil, err
 			}
-			node = newNode(ndSub, node, rhs)
+			node, err = p.newSub(node, rhs)
+			if err != nil {
+				return nil, err
+			}
 			continue
 		}
 		return node, nil
@@ -618,7 +701,7 @@ func (p *parser) primary() (*node, error) {
 			return nil, fmt.Errorf("undefined variable: %s", name)
 		}
 		node := newNode(ndVar, nil, nil)
-		node.offset = lvar.offset
+		node.lvar = lvar
 		return node, nil
 	}
 	num, err := p.expectNumber()

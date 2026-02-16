@@ -205,7 +205,7 @@ func genFunc(funct *function) {
 func genAddr(node *node) {
 	switch node.kind {
 	case ndVar:
-		offset := node.offset
+		offset := node.lvar.offset
 		fmt.Printf("	mov rax, rbp\n")
 		fmt.Printf("	sub rax, %d\n", offset)
 		fmt.Printf("	push rax\n")
