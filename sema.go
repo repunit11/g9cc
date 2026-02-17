@@ -11,6 +11,7 @@ func addType(node *node) {
 	if node == nil {
 		return
 	}
+	addType(node.next)
 
 	addType(node.lhs)
 	addType(node.rhs)
@@ -41,5 +42,16 @@ func addType(node *node) {
 			node.ty = &ty{kind: tyInt, size: 4}
 			return
 		}
+	case ndSizeof:
+		node.ty = &ty{
+			kind: tyInt,
+			base: nil,
+			name: nil,
+			size: 4,
+		}
+		node.kind = ndNum
+		node.val = node.lhs.ty.size
+		node.rhs = nil
+		node.lhs = nil
 	}
 }

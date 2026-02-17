@@ -32,6 +32,7 @@ const (
 	ndFuncall
 	ndAddr
 	ndDeref
+	ndSizeof
 	ndNum
 )
 
@@ -657,17 +658,11 @@ func (p *parser) unary() (*node, error) {
 
 	if p.tok.kind == tkSizeof {
 		p.tok = p.tok.next
-		node, err := p.unary()
+		lhs, err := p.unary()
 		if err != nil {
 			return nil, err
 		}
-
-		addType(node)
-		if node.ty == nil {
-			return nil, fmt.Errorf("internal error: missing type in sizeof")
-		}
-
-		node = newNodeNum(node.ty.size)
+		node := newNode(ndSizeof, lhs, nil)
 		return node, nil
 	}
 
