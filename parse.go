@@ -505,63 +505,6 @@ func (p *parser) relational() (*node, error) {
 	}
 }
 
-func (p *parser) newAdd(lhs *node, rhs *node) (*node, error) {
-	addType(lhs)
-	addType(rhs)
-	if lhs.ty == nil || rhs.ty == nil {
-		return nil, fmt.Errorf("internal error: missing type in '+'")
-	}
-
-	// num + num
-	if lhs.ty.kind == tyInt && rhs.ty.kind == tyInt {
-		return newNode(ndAdd, lhs, rhs), nil
-	}
-
-	// num + ptr to ptr + num
-	if lhs.ty.kind == tyInt && rhs.ty.kind == tyPtr {
-		lhs, rhs = rhs, lhs
-	}
-
-	// ptr + num
-	if lhs.ty.kind == tyPtr && rhs.ty.kind == tyInt {
-		rhs = newNode(ndMul, rhs, newNodeNum(8))
-		return newNode(ndAdd, lhs, rhs), nil
-	}
-
-	return nil, fmt.Errorf("invalid operands for +")
-}
-
-func (p *parser) newSub(lhs *node, rhs *node) (*node, error) {
-	addType(lhs)
-	addType(rhs)
-	if lhs.ty == nil || rhs.ty == nil {
-		return nil, fmt.Errorf("internal error: missing type in '-'")
-	}
-
-	// num - num
-	if lhs.ty.kind == tyInt && rhs.ty.kind == tyInt {
-		return newNode(ndSub, lhs, rhs), nil
-	}
-
-	// ptr - num
-	if lhs.ty.kind == tyPtr && rhs.ty.kind == tyInt {
-		rhs = newNode(ndMul, rhs, newNodeNum(8))
-		addType(rhs)
-		node := newNode(ndSub, lhs, rhs)
-		node.ty = lhs.ty
-		return node, nil
-	}
-
-	// ptr - ptr
-	if lhs.ty.kind == tyPtr && rhs.ty.kind == tyPtr {
-		node := newNode(ndSub, lhs, rhs)
-		node.ty = &ty{kind: tyInt}
-		return newNode(ndDiv, node, newNodeNum(8)), nil
-	}
-
-	return nil, fmt.Errorf("invalid operands for -")
-}
-
 // add = mul ("+" mul | "-" mul)*
 func (p *parser) add() (*node, error) {
 	node, err := p.mul()
@@ -575,10 +518,7 @@ func (p *parser) add() (*node, error) {
 			if err != nil {
 				return nil, err
 			}
-			node, err = p.newAdd(node, rhs)
-			if err != nil {
-				return nil, err
-			}
+			node = newNode(ndAdd, node, rhs)
 			continue
 		}
 		if p.consume("-") {
@@ -586,10 +526,7 @@ func (p *parser) add() (*node, error) {
 			if err != nil {
 				return nil, err
 			}
-			node, err = p.newSub(node, rhs)
-			if err != nil {
-				return nil, err
-			}
+			node = newNode(ndSub, node, rhs)
 			continue
 		}
 		return node, nil
