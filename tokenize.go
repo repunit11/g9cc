@@ -17,6 +17,7 @@ const (
 	tkIdent
 	tkInt
 	tkNum
+	tkSizeof
 	tkEOF
 )
 
@@ -113,6 +114,8 @@ func scanIdentOrKeyword(s string, i int) (*token, int, bool) {
 		kind = tkFor
 	case "int":
 		kind = tkInt
+	case "sizeof":
+		kind = tkSizeof
 	}
 	return newToken(kind, ident, len(ident)), j, true
 }

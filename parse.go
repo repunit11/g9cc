@@ -343,7 +343,7 @@ func (p *parser) declspec() (*ty, error) {
 		return nil, fmt.Errorf("expected type specifier 'int'")
 	}
 	p.tok = p.tok.next
-	return &ty{kind: tyInt}, nil
+	return &ty{kind: tyInt, size: 4}, nil
 }
 
 // declarator = "*"* ident
@@ -623,7 +623,7 @@ func (p *parser) mul() (*node, error) {
 	}
 }
 
-// unary = ("+" | "-")? unary() | "*" unary | "&" unary
+// unary = ("+" | "-")? unary() | "*" unary | "&" unary | "sizeof" unary()
 func (p *parser) unary() (*node, error) {
 	if p.consume("+") {
 		return p.unary()
@@ -654,6 +654,23 @@ func (p *parser) unary() (*node, error) {
 		node = newNode(ndAddr, node, nil)
 		return node, nil
 	}
+
+	if p.tok.kind == tkSizeof {
+		p.tok = p.tok.next
+		node, err := p.unary()
+		if err != nil {
+			return nil, err
+		}
+
+		addType(node)
+		if node.ty == nil {
+			return nil, fmt.Errorf("internal error: missing type in sizeof")
+		}
+
+		node = newNodeNum(node.ty.size)
+		return node, nil
+	}
+
 	return p.primary()
 }
 

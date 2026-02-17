@@ -51,6 +51,11 @@ assert_prog 0 'int main(){ return 0; }'
 assert_prog 3 'int id(int x){ return x; } int main(){ return id(3); }'
 assert_prog 5 'int add(int x, int y){ return x+y; } int main(){ return add(2,3); }'
 assert_prog 3 'int main(){ int x; x=3; return x; }'
+assert_prog 8 'int main() { int *x; return sizeof(x); }'
+assert_prog 4 'int main() { int x; x=1; return sizeof(x=2); }'
+assert_prog 1 'int main() { int x;x=1; sizeof(x=2); return x; }'
+assert 4 "sizeof(1);"
+assert 8 "int a;a=1; sizeof(&a);"
 assert 7 '{ int x; x=3; int y;y=5; *(&y+2-1)=7; return x; }'
 assert 8 '{ int x; x=3; int y; y=5; x=x+y; return x; }'
 assert 0 '0;'
