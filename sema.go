@@ -11,6 +11,10 @@ func sema(prog *function) error {
 	return nil
 }
 
+func intType() *ty {
+	return &ty{kind: tyInt, size: 4}
+}
+
 func walk(nodes ...*node) error {
 	for _, n := range nodes {
 		if err := addType(n); err != nil {
@@ -18,6 +22,65 @@ func walk(nodes ...*node) error {
 		}
 	}
 	return nil
+}
+
+func typeAdd(node *node) error {
+	// num + num
+	if node.lhs.ty.kind == tyInt && node.rhs.ty.kind == tyInt {
+		node.ty = intType()
+		return nil
+	}
+
+	// num + ptr to ptr + num
+	if node.lhs.ty.kind == tyInt && node.rhs.ty.kind == tyPtr {
+		node.lhs, node.rhs = node.rhs, node.lhs
+	}
+
+	// ptr + num
+	if node.lhs.ty.kind == tyPtr && node.rhs.ty.kind == tyInt {
+		scale := newNode(ndMul, node.rhs, newNodeNum(8))
+		if err := addType(scale); err != nil {
+			return err
+		}
+		node.rhs = scale
+		node.ty = node.lhs.ty
+		return nil
+	}
+
+	return fmt.Errorf("invalid operands for +")
+}
+
+func typeSub(node *node) error {
+	// num - num
+	if node.lhs.ty.kind == tyInt && node.rhs.ty.kind == tyInt {
+		node.ty = intType()
+		return nil
+	}
+
+	// ptr - num
+	if node.lhs.ty.kind == tyPtr && node.rhs.ty.kind == tyInt {
+		scale := newNode(ndMul, node.rhs, newNodeNum(8))
+		if err := addType(scale); err != nil {
+			return err
+		}
+		node.rhs = scale
+		node.ty = node.lhs.ty
+		return nil
+	}
+
+	// ptr - ptr
+	if node.lhs.ty.kind == tyPtr && node.rhs.ty.kind == tyPtr {
+		sub := newNode(ndSub, node.lhs, node.rhs)
+		sub.ty = intType()
+
+		node.kind = ndDiv
+		node.lhs = sub
+		node.rhs = newNodeNum(8)
+		node.ty = intType()
+		return nil
+	}
+
+	return fmt.Errorf("invalid operands for -")
 }
 
 func addType(node *node) error {
@@ -30,68 +93,14 @@ func addType(node *node) error {
 
 	switch node.kind {
 	case ndAdd:
-		// num + num
-		if node.lhs.ty.kind == tyInt && node.rhs.ty.kind == tyInt {
-			node.ty = &ty{
-				kind: tyInt,
-				size: 4,
-			}
-			return nil
-		}
-
-		// num + ptr to ptr + num
-		if node.lhs.ty.kind == tyInt && node.rhs.ty.kind == tyPtr {
-			node.lhs, node.rhs = node.rhs, node.lhs
-		}
-
-		// ptr + num
-		if node.lhs.ty.kind == tyPtr && node.rhs.ty.kind == tyInt {
-			scale := newNode(ndMul, node.rhs, newNodeNum(8))
-			if err := addType(scale); err != nil {
-				return err
-			}
-			node.rhs = scale
-			node.ty = node.lhs.ty
-			return nil
-		}
-
-		return fmt.Errorf("invalid operands for +")
+		return typeAdd(node)
 	case ndSub:
-		// num - num
-		if node.lhs.ty.kind == tyInt && node.rhs.ty.kind == tyInt {
-			node.ty = &ty{kind: tyInt, size: 4}
-			return nil
-		}
-
-		// ptr - num
-		if node.lhs.ty.kind == tyPtr && node.rhs.ty.kind == tyInt {
-			scale := newNode(ndMul, node.rhs, newNodeNum(8))
-			if err := addType(scale); err != nil {
-				return err
-			}
-			node.rhs = scale
-			node.ty = node.lhs.ty
-			return nil
-		}
-
-		// ptr - ptr
-		if node.lhs.ty.kind == tyPtr && node.rhs.ty.kind == tyPtr {
-			basesize := 8
-			sub := newNode(ndSub, node.lhs, node.rhs)
-			sub.ty = &ty{kind: tyInt, size: 4}
-
-			node.kind = ndDiv
-			node.lhs = sub
-			node.rhs = newNodeNum(basesize)
-			node.ty = &ty{kind: tyInt, size: 4}
-			return nil
-		}
-		return fmt.Errorf("invalid operands for -")
+		return typeSub(node)
 	case ndAssign:
 		node.ty = node.lhs.ty
 		return nil
 	case ndMul, ndDiv, ndEq, ndNe, ndLt, ndLe, ndFuncall, ndNum:
-		node.ty = &ty{kind: tyInt, size: 4}
+		node.ty = intType()
 		return nil
 	case ndVar:
 		node.ty = node.lvar.ty
@@ -104,16 +113,11 @@ func addType(node *node) error {
 			node.ty = node.lhs.ty.base
 			return nil
 		} else {
-			node.ty = &ty{kind: tyInt, size: 4}
+			node.ty = intType()
 			return nil
 		}
 	case ndSizeof:
-		node.ty = &ty{
-			kind: tyInt,
-			base: nil,
-			name: nil,
-			size: 4,
-		}
+		node.ty = intType()
 		node.kind = ndNum
 		node.val = node.lhs.ty.size
 		node.rhs = nil
