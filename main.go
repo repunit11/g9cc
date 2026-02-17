@@ -27,6 +27,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// 型付けする
+	if err := sema(functs); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 	// アセンブリの生成
 	codegen(functs)
 }
