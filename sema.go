@@ -25,25 +25,35 @@ func walk(nodes ...*node) error {
 }
 
 func typeAdd(node *node) error {
+	lhsTy := node.lhs.ty
+	rhsTy := node.rhs.ty
+
+	if lhsTy.kind == tyArray {
+		lhsTy = pointerTo(lhsTy.base)
+	}
+	if rhsTy.kind == tyArray {
+		rhsTy = pointerTo(rhsTy.base)
+	}
+
 	// num + num
-	if node.lhs.ty.kind == tyInt && node.rhs.ty.kind == tyInt {
+	if lhsTy.kind == tyInt && rhsTy.kind == tyInt {
 		node.ty = intType()
 		return nil
 	}
 
 	// num + ptr to ptr + num
-	if node.lhs.ty.kind == tyInt && node.rhs.ty.kind == tyPtr {
+	if lhsTy.kind == tyInt && rhsTy.kind == tyPtr {
 		node.lhs, node.rhs = node.rhs, node.lhs
 	}
 
 	// ptr + num
-	if node.lhs.ty.kind == tyPtr && node.rhs.ty.kind == tyInt {
+	if lhsTy.kind == tyPtr && rhsTy.kind == tyInt {
 		scale := newNode(ndMul, node.rhs, newNodeNum(8))
 		if err := addType(scale); err != nil {
 			return err
 		}
 		node.rhs = scale
-		node.ty = node.lhs.ty
+		node.ty = lhsTy
 		return nil
 	}
 
@@ -51,14 +61,24 @@ func typeAdd(node *node) error {
 }
 
 func typeSub(node *node) error {
+	lhsTy := node.lhs.ty
+	rhsTy := node.rhs.ty
+
+	if lhsTy.kind == tyArray {
+		lhsTy = pointerTo(lhsTy.base)
+	}
+	if rhsTy.kind == tyArray {
+		rhsTy = pointerTo(rhsTy.base)
+	}
+
 	// num - num
-	if node.lhs.ty.kind == tyInt && node.rhs.ty.kind == tyInt {
+	if lhsTy.kind == tyInt && rhsTy.kind == tyInt {
 		node.ty = intType()
 		return nil
 	}
 
 	// ptr - num
-	if node.lhs.ty.kind == tyPtr && node.rhs.ty.kind == tyInt {
+	if lhsTy.kind == tyPtr && rhsTy.kind == tyInt {
 		scale := newNode(ndMul, node.rhs, newNodeNum(8))
 		if err := addType(scale); err != nil {
 			return err
@@ -69,7 +89,7 @@ func typeSub(node *node) error {
 	}
 
 	// ptr - ptr
-	if node.lhs.ty.kind == tyPtr && node.rhs.ty.kind == tyPtr {
+	if lhsTy.kind == tyPtr && rhsTy.kind == tyPtr {
 		sub := newNode(ndSub, node.lhs, node.rhs)
 		sub.ty = intType()
 
@@ -96,26 +116,43 @@ func addType(node *node) error {
 		return typeAdd(node)
 	case ndSub:
 		return typeSub(node)
-	case ndAssign:
+	case ndNe:
 		node.ty = node.lhs.ty
 		return nil
-	case ndMul, ndDiv, ndEq, ndNe, ndLt, ndLe, ndFuncall, ndNum:
+	case ndAssign:
+		if node.lhs.ty.kind == tyArray {
+			return fmt.Errorf("not an lvalue")
+		}
+		node.ty = node.lhs.ty
+		return nil
+	case ndMul, ndDiv, ndEq, ndLt, ndLe, ndNum:
+		node.ty = intType()
+		return nil
+	case ndFuncall:
+		for _, arg := range node.args {
+			if err := addType(arg); err != nil {
+				return err
+			}
+		}
 		node.ty = intType()
 		return nil
 	case ndVar:
 		node.ty = node.lvar.ty
 		return nil
 	case ndAddr:
-		node.ty = pointerTo(node.lhs.ty)
+		if node.lhs.ty.kind == tyArray {
+			node.ty = pointerTo(node.lhs.ty.base)
+		} else {
+			node.ty = pointerTo(node.lhs.ty)
+		}
 		return nil
 	case ndDeref:
-		if node.lhs.ty.kind == tyPtr {
+		if node.lhs.ty.base != nil {
 			node.ty = node.lhs.ty.base
-			return nil
 		} else {
 			node.ty = intType()
-			return nil
 		}
+		return nil
 	case ndSizeof:
 		node.ty = intType()
 		node.kind = ndNum

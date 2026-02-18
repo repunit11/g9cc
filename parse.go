@@ -69,6 +69,26 @@ type LVar struct {
 	ty     *ty
 }
 
+func alignTo(n, align int) int {
+	return (n + align - 1) / align * align
+}
+
+func stackAllocSize(t *ty) int {
+	switch t.kind {
+	case tyArray:
+		return alignTo(t.arrayLen*8, 8)
+	default:
+		return 8
+	}
+}
+
+func getNum(tok *token) (int, error) {
+	if tok.kind != tkNum {
+		return 0, fmt.Errorf("expected a number")
+	}
+	return tok.val, nil
+}
+
 func newNode(kind nodeKind, lhs *node, rhs *node) *node {
 	node := &node{kind: kind, lhs: lhs, rhs: rhs}
 	return node
@@ -157,7 +177,7 @@ func (p *parser) funcdef() (*function, error) {
 				if lvar != nil {
 					return nil, fmt.Errorf("%s is already defined", tok.str)
 				}
-				p.nextOffset += 8
+				p.nextOffset += stackAllocSize(ty)
 				lvar = &LVar{
 					name:   tok.str,
 					len:    tok.len,
@@ -347,8 +367,27 @@ func (p *parser) declspec() (*ty, error) {
 	return &ty{kind: tyInt, size: 4}, nil
 }
 
-// declarator = "*"* ident
+// type-suffix = "[" num "]" | ε
+func (p *parser) typeSuffix(ty *ty) (*ty, error) {
+	if p.consume("[") {
+		sz, err := getNum(p.tok)
+		if err != nil {
+			return nil, err
+		}
+		p.tok = p.tok.next
+		if err := p.expect("]"); err != nil {
+			return nil, err
+		}
+
+		return arrayOf(ty, sz), nil
+	}
+
+	return ty, nil
+}
+
+// declarator = "*"* ident type-suffix
 func (p *parser) declarator(ty *ty) (*ty, *token, error) {
+	var err error
 	for p.consume("*") {
 		ty = pointerTo(ty)
 	}
@@ -359,6 +398,13 @@ func (p *parser) declarator(ty *ty) (*ty, *token, error) {
 
 	tok := p.tok
 	p.tok = p.tok.next
+
+	ty, err = p.typeSuffix(ty)
+	if err != nil {
+		return nil, nil, err
+	}
+	ty.name = p.tok
+
 	return ty, tok, nil
 }
 
@@ -378,7 +424,7 @@ func (p *parser) declaration() (*node, error) {
 	if lvar != nil {
 		return nil, fmt.Errorf("%s is already defined", tok.str)
 	}
-	p.nextOffset += 8
+	p.nextOffset += stackAllocSize(ty)
 	lvar = &LVar{
 		next:   p.locals,
 		name:   tok.str,

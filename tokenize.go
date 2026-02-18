@@ -51,6 +51,8 @@ var singlePunct = map[byte]struct{}{
 	'}': {},
 	',': {},
 	'&': {},
+	'[': {},
+	']': {},
 }
 
 func readNumber(s string, i int) (string, int, error) {

@@ -12,6 +12,19 @@ func count() int {
 	cntif++
 	return cntif
 }
+
+func load(ty *ty) {
+	if ty.kind == tyArray {
+		return
+	}
+	fmt.Printf("	mov rax, [rax]\n")
+}
+
+func store() {
+	fmt.Printf("	pop rax\n")
+	fmt.Printf("	mov [rax], rdi\n")
+}
+
 func genExpr(node *node) {
 	switch node.kind {
 	case ndNum:
@@ -20,15 +33,14 @@ func genExpr(node *node) {
 	case ndVar:
 		genAddr(node)
 		fmt.Printf("	pop rax\n")
-		fmt.Printf("	mov rax, [rax]\n")
+		load(node.ty)
 		fmt.Printf("	push rax\n")
 		return
 	case ndAssign:
 		genAddr(node.lhs)
 		genExpr(node.rhs)
 		fmt.Printf("	pop rdi\n")
-		fmt.Printf("	pop rax\n")
-		fmt.Printf("	mov [rax], rdi\n")
+		store()
 		fmt.Printf("	push rdi\n")
 		return
 	case ndFuncall: // TODO: 関数呼び出し前にRSPを16の倍数になるようにする
@@ -51,7 +63,7 @@ func genExpr(node *node) {
 	case ndDeref:
 		genExpr(node.lhs)
 		fmt.Printf("	pop rax\n")
-		fmt.Printf("	mov rax, [rax]\n")
+		load(node.ty)
 		fmt.Printf("	push rax\n")
 		return
 	}

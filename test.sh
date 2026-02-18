@@ -54,6 +54,10 @@ assert_prog 3 'int main(){ int x; x=3; return x; }'
 assert_prog 8 'int main() { int *x; return sizeof(x); }'
 assert_prog 4 'int main() { int x; x=1; return sizeof(x=2); }'
 assert_prog 1 'int main() { int x;x=1; sizeof(x=2); return x; }'
+assert_prog 3 'int main() { int x[2]; int *y; y=&x; *y=3; return *x; }'
+assert_prog 3 'int main() { int x[3]; *x=3; *(x+1)=4; *(x+2)=5; return *x; }'
+assert_prog 4 'int main() { int x[3]; *x=3; *(x+1)=4; *(x+2)=5; return *(x+1); }'
+assert_prog 5 'int main() { int x[3]; *x=3; *(x+1)=4; *(x+2)=5; return *(x+2); }'
 assert 4 "sizeof(1);"
 assert 8 "int a;a=1; sizeof(&a);"
 assert 7 '{ int x; x=3; int y;y=5; *(&y+2-1)=7; return x; }'
