@@ -24,9 +24,9 @@ func walk(nodes ...*node) error {
 	return nil
 }
 
-func typeAdd(node *node) error {
-	lhsTy := node.lhs.ty
-	rhsTy := node.rhs.ty
+func normalizeArithmeticTypes(node *node) (lhsTy, rhsTy *ty) {
+	lhsTy = node.lhs.ty
+	rhsTy = node.rhs.ty
 
 	if lhsTy.kind == tyArray {
 		lhsTy = pointerTo(lhsTy.base)
@@ -34,6 +34,21 @@ func typeAdd(node *node) error {
 	if rhsTy.kind == tyArray {
 		rhsTy = pointerTo(rhsTy.base)
 	}
+	return lhsTy, rhsTy
+}
+
+func scalePtrIndex(node *node, ptrTy *ty) error {
+	scale := newNode(ndMul, node.rhs, newNodeNum(8))
+	if err := addType(scale); err != nil {
+		return err
+	}
+	node.rhs = scale
+	node.ty = ptrTy
+	return nil
+}
+
+func typeAdd(node *node) error {
+	lhsTy, rhsTy := normalizeArithmeticTypes(node)
 
 	// num + num
 	if lhsTy.kind == tyInt && rhsTy.kind == tyInt {
@@ -48,12 +63,9 @@ func typeAdd(node *node) error {
 
 	// ptr + num
 	if lhsTy.kind == tyPtr && rhsTy.kind == tyInt {
-		scale := newNode(ndMul, node.rhs, newNodeNum(8))
-		if err := addType(scale); err != nil {
+		if err := scalePtrIndex(node, lhsTy); err != nil {
 			return err
 		}
-		node.rhs = scale
-		node.ty = lhsTy
 		return nil
 	}
 
@@ -79,12 +91,9 @@ func typeSub(node *node) error {
 
 	// ptr - num
 	if lhsTy.kind == tyPtr && rhsTy.kind == tyInt {
-		scale := newNode(ndMul, node.rhs, newNodeNum(8))
-		if err := addType(scale); err != nil {
+		if err := scalePtrIndex(node, lhsTy); err != nil {
 			return err
 		}
-		node.rhs = scale
-		node.ty = node.lhs.ty
 		return nil
 	}
 

@@ -89,6 +89,23 @@ func getNum(tok *token) (int, error) {
 	return tok.val, nil
 }
 
+func (p *parser) declareLocal(tok *token, ty *ty) (*LVar, error) {
+	lvar := p.findLVar(tok.str)
+	if lvar != nil {
+		return nil, fmt.Errorf("%s is already defined", tok.str)
+	}
+	p.nextOffset += stackAllocSize(ty)
+	lvar = &LVar{
+		next:   p.locals,
+		name:   tok.str,
+		len:    tok.len,
+		offset: p.nextOffset,
+		ty:     ty,
+	}
+	p.locals = lvar
+	return lvar, nil
+}
+
 func newNode(kind nodeKind, lhs *node, rhs *node) *node {
 	node := &node{kind: kind, lhs: lhs, rhs: rhs}
 	return node
@@ -173,19 +190,11 @@ func (p *parser) funcdef() (*function, error) {
 				tok := p.tok
 				p.tok = p.tok.next
 
-				lvar := p.findLVar(tok.str)
-				if lvar != nil {
-					return nil, fmt.Errorf("%s is already defined", tok.str)
+				lvar, err := p.declareLocal(tok, ty)
+				if err != nil {
+					return nil, err
 				}
-				p.nextOffset += stackAllocSize(ty)
-				lvar = &LVar{
-					name:   tok.str,
-					len:    tok.len,
-					offset: p.nextOffset,
-					next:   p.locals,
-					ty:     ty,
-				}
-				p.locals = lvar
+
 				if len(params) >= len(argregs) {
 					return nil, fmt.Errorf("too many parameters: max %d", len(argregs))
 				}

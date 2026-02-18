@@ -161,6 +161,15 @@ func newToken(kind tokenKind, str string, len int) *token {
 	return &token{kind: kind, str: str, len: len}
 }
 
+func appendToken(cur **token, tok *token) error {
+	if tok == nil {
+		return fmt.Errorf("internal error: nil token")
+	}
+	(*cur).next = tok
+	*cur = tok
+	return nil
+}
+
 func tokenize(s string) (*token, error) {
 	head := token{next: nil}
 	cur := &head
@@ -175,22 +184,18 @@ func tokenize(s string) (*token, error) {
 
 		// 識別子・予約語の時トークン化
 		if tok, next, ok := scanIdentOrKeyword(s, i); ok {
-			if tok == nil {
-				return nil, fmt.Errorf("internal error: nil token")
+			if err := appendToken(&cur, tok); err != nil {
+				return nil, err
 			}
-			cur.next = tok
-			cur = tok
 			i = next
 			continue
 		}
 
 		// 複数文字のトークン化
 		if tok, next, ok := scanDoublePunct(s, i); ok {
-			if tok == nil {
-				return nil, fmt.Errorf("internal error: nil token")
+			if err := appendToken(&cur, tok); err != nil {
+				return nil, err
 			}
-			cur.next = tok
-			cur = tok
 			i = next
 			continue
 		}
@@ -198,8 +203,9 @@ func tokenize(s string) (*token, error) {
 		// 記号の時トークン化
 		if punct, next, ok := scanSinglePunct(s, i); ok {
 			tok := newToken(tkPunct, punct, 1)
-			cur.next = tok
-			cur = tok
+			if err := appendToken(&cur, tok); err != nil {
+				return nil, err
+			}
 			i = next
 			continue
 		}
@@ -208,11 +214,9 @@ func tokenize(s string) (*token, error) {
 		if tok, next, ok, err := scanNumber(s, i); err != nil {
 			return nil, err
 		} else if ok {
-			if tok == nil {
-				return nil, fmt.Errorf("internal error: nil token")
+			if err := appendToken(&cur, tok); err != nil {
+				return nil, err
 			}
-			cur.next = tok
-			cur = tok
 			i = next
 			continue
 		}
