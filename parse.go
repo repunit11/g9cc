@@ -8,6 +8,7 @@ type parser struct {
 	tok        *token
 	locals     *LVar
 	nextOffset int
+	input      string
 }
 
 type nodeKind int
@@ -92,7 +93,7 @@ func getNum(tok *token) (int, error) {
 func (p *parser) declareLocal(tok *token, ty *ty) (*LVar, error) {
 	lvar := p.findLVar(tok.str)
 	if lvar != nil {
-		return nil, fmt.Errorf("%s is already defined", tok.str)
+		return nil, errorAt(p.input, tok.pos, fmt.Sprintf("%s is already defined", tok.str))
 	}
 	p.nextOffset += stackAllocSize(ty)
 	lvar = &LVar{
@@ -136,7 +137,7 @@ func (p *parser) consume(op string) bool {
 
 func (p *parser) expect(op string) error {
 	if p.tok.kind != tkPunct || len(op) != p.tok.len || p.tok.str != op {
-		return fmt.Errorf("expected %q", op)
+		return errorAt(p.input, p.tok.pos, fmt.Sprintf("expected %q", op))
 	}
 	p.tok = p.tok.next
 	return nil
@@ -144,7 +145,7 @@ func (p *parser) expect(op string) error {
 
 func (p *parser) expectNumber() (int, error) {
 	if p.tok.kind != tkNum {
-		return 0, fmt.Errorf("expected a number")
+		return 0, errorAt(p.input, p.tok.pos, "expected a number")
 	}
 	val := p.tok.val
 	p.tok = p.tok.next
@@ -185,7 +186,7 @@ func (p *parser) funcdef() (*function, error) {
 					return nil, err
 				}
 				if p.tok.kind != tkIdent {
-					return nil, fmt.Errorf("expected ident")
+					return nil, errorAt(p.input, p.tok.pos, "expected identifier")
 				}
 				tok := p.tok
 				p.tok = p.tok.next
@@ -196,7 +197,7 @@ func (p *parser) funcdef() (*function, error) {
 				}
 
 				if len(params) >= len(argregs) {
-					return nil, fmt.Errorf("too many parameters: max %d", len(argregs))
+					return nil, errorAt(p.input, p.tok.pos, fmt.Sprintf("too many parameters: max %d", len(argregs)))
 				}
 				params = append(params, lvar)
 
@@ -212,7 +213,7 @@ func (p *parser) funcdef() (*function, error) {
 		}
 
 		if p.tok.str != "{" {
-			return nil, fmt.Errorf("expected {")
+			return nil, errorAt(p.input, p.tok.pos, "expected {")
 		}
 		body, err := p.stmt()
 		if err != nil {
@@ -221,7 +222,7 @@ func (p *parser) funcdef() (*function, error) {
 		funct.body = body
 		return funct, nil
 	}
-	return nil, fmt.Errorf("unexpected token")
+	return nil, errorAt(p.input, p.tok.pos, "unexpected token")
 }
 
 // stmt = exprStmt
@@ -370,7 +371,7 @@ func (p *parser) stmt() (*node, error) {
 // declspec = "int"
 func (p *parser) declspec() (*ty, error) {
 	if p.tok.kind != tkInt {
-		return nil, fmt.Errorf("expected type specifier 'int'")
+		return nil, errorAt(p.input, p.tok.pos, "expected type specifier 'int'")
 	}
 	p.tok = p.tok.next
 	return &ty{kind: tyInt, size: 4}, nil
@@ -402,7 +403,7 @@ func (p *parser) declarator(ty *ty) (*ty, *token, error) {
 	}
 
 	if p.tok.kind != tkIdent {
-		return nil, nil, fmt.Errorf("expected a variable name")
+		return nil, nil, errorAt(p.input, p.tok.pos, "expected a variable name")
 	}
 
 	tok := p.tok
@@ -429,19 +430,9 @@ func (p *parser) declaration() (*node, error) {
 		return nil, err
 	}
 
-	lvar := p.findLVar(tok.str)
-	if lvar != nil {
-		return nil, fmt.Errorf("%s is already defined", tok.str)
+	if _, err := p.declareLocal(tok, ty); err != nil {
+		return nil, err
 	}
-	p.nextOffset += stackAllocSize(ty)
-	lvar = &LVar{
-		next:   p.locals,
-		name:   tok.str,
-		len:    tok.len,
-		offset: p.nextOffset,
-		ty:     ty,
-	}
-	p.locals = lvar
 
 	if err := p.expect(";"); err != nil {
 		return nil, err
@@ -675,7 +666,8 @@ func (p *parser) primary() (*node, error) {
 	}
 
 	if p.tok.kind == tkIdent {
-		name := p.tok.str
+		tok := p.tok
+		name := tok.str
 		p.tok = p.tok.next
 		if p.consume("(") {
 			node := newNode(ndFuncall, nil, nil)
@@ -702,7 +694,7 @@ func (p *parser) primary() (*node, error) {
 		}
 		lvar := p.findLVar(name)
 		if lvar == nil {
-			return nil, fmt.Errorf("undefined variable: %s", name)
+			return nil, errorAt(p.input, tok.pos, fmt.Sprintf("undefined variable: %s", name))
 		}
 		node := newNode(ndVar, nil, nil)
 		node.lvar = lvar

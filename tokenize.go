@@ -27,6 +27,7 @@ type token struct {
 	val  int
 	str  string
 	len  int
+	pos  int
 }
 
 var doublePunct = map[string]struct{}{
@@ -119,7 +120,7 @@ func scanIdentOrKeyword(s string, i int) (*token, int, bool) {
 	case "sizeof":
 		kind = tkSizeof
 	}
-	return newToken(kind, ident, len(ident)), j, true
+	return newToken(kind, ident, len(ident), i), j, true
 }
 
 func scanDoublePunct(s string, i int) (*token, int, bool) {
@@ -128,7 +129,7 @@ func scanDoublePunct(s string, i int) (*token, int, bool) {
 		return nil, i, ok
 	}
 	j := i + 2
-	return newToken(tkPunct, val, len(val)), j, ok
+	return newToken(tkPunct, val, len(val), i), j, ok
 }
 
 func scanSinglePunct(s string, i int) (string, int, bool) {
@@ -152,13 +153,13 @@ func scanNumber(s string, i int) (*token, int, bool, error) {
 	if err != nil {
 		return nil, i, false, err
 	}
-	tok := newToken(tkNum, num, 1)
+	tok := newToken(tkNum, num, 1, i)
 	tok.val = val
 	return tok, next, true, nil
 }
 
-func newToken(kind tokenKind, str string, len int) *token {
-	return &token{kind: kind, str: str, len: len}
+func newToken(kind tokenKind, str string, len int, pos int) *token {
+	return &token{kind: kind, str: str, len: len, pos: pos}
 }
 
 func appendToken(cur **token, tok *token) error {
@@ -202,7 +203,7 @@ func tokenize(s string) (*token, error) {
 
 		// 記号の時トークン化
 		if punct, next, ok := scanSinglePunct(s, i); ok {
-			tok := newToken(tkPunct, punct, 1)
+			tok := newToken(tkPunct, punct, 1, i)
 			if err := appendToken(&cur, tok); err != nil {
 				return nil, err
 			}
@@ -224,6 +225,6 @@ func tokenize(s string) (*token, error) {
 		return nil, errorAt(s, i, "unexpected token")
 	}
 	// 末尾文字をつけてトークン化
-	cur.next = newToken(tkEOF, "", 0)
+	cur.next = newToken(tkEOF, "", 0, i)
 	return head.next, nil
 }
