@@ -17,18 +17,19 @@ type ty struct {
 }
 
 func pointerTo(base *ty) *ty {
-	ty := new(ty)
-	ty.kind = tyPtr
-	ty.base = base
-	ty.size = 8
+	ty := &ty{
+		kind: tyPtr,
+		base: base,
+		size: 8,
+	}
 	return ty
 }
 
 func arrayOf(base *ty, len int) *ty {
 	ty := &ty{
 		kind:     tyArray,
-		size:     base.size * len,
 		base:     base,
+		size:     base.size * len,
 		arrayLen: len,
 	}
 	return ty
