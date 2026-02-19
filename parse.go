@@ -467,8 +467,12 @@ func (p *parser) declaration() (*node, error) {
 	return newNode(ndBlock, head.next, nil), nil
 }
 
-// exprStmt = expr ";"
+// exprStmt = expr? ";"
 func (p *parser) exprStmt() (*node, error) {
+	if p.consume(";") {
+		return newNode(ndBlock, nil, nil), nil
+	}
+
 	node, err := p.expr()
 	if err != nil {
 		return nil, err
