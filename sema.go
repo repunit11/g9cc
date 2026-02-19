@@ -38,7 +38,7 @@ func normalizeArithmeticTypes(node *node) (lhsTy, rhsTy *ty) {
 }
 
 func scalePtrIndex(node *node, ptrTy *ty) error {
-	scale := newNode(ndMul, node.rhs, newNodeNum(8))
+	scale := newNode(ndMul, node.rhs, newNodeNum(ptrTy.base.size))
 	if err := addType(scale); err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func typeSub(node *node) error {
 
 		node.kind = ndDiv
 		node.lhs = sub
-		node.rhs = newNodeNum(8)
+		node.rhs = newNodeNum(lhsTy.base.size)
 		node.ty = intType()
 		return nil
 	}

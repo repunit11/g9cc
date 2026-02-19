@@ -6,7 +6,8 @@ import (
 )
 
 var cntif int
-var argregs = []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"}
+var argregs64 = []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"}
+var argregs32 = []string{"edi", "esi", "edx", "ecx", "r8d", "r9d"}
 
 func count() int {
 	cntif++
@@ -17,12 +18,20 @@ func load(ty *ty) {
 	if ty.kind == tyArray {
 		return
 	}
-	fmt.Printf("	mov rax, [rax]\n")
+	if ty.size == 8 {
+		fmt.Printf("	mov rax, [rax]\n")
+	} else if ty.size == 4 {
+		fmt.Printf("	mov eax, [rax]\n")
+	}
 }
 
-func store() {
+func store(ty *ty) {
 	fmt.Printf("	pop rax\n")
-	fmt.Printf("	mov [rax], rdi\n")
+	if ty.size == 8 {
+		fmt.Printf("	mov [rax], rdi\n")
+	} else if ty.size == 4 {
+		fmt.Printf("	mov [rax], edi\n")
+	}
 }
 
 func genExpr(node *node) {
@@ -40,19 +49,19 @@ func genExpr(node *node) {
 		genAddr(node.lhs)
 		genExpr(node.rhs)
 		fmt.Printf("	pop rdi\n")
-		store()
+		store(node.lhs.ty)
 		fmt.Printf("	push rdi\n")
 		return
 	case ndFuncall: // TODO: 関数呼び出し前にRSPを16の倍数になるようにする
 		for i := len(node.args) - 1; i >= 0; i-- {
 			genExpr(node.args[i])
 		}
-		if len(node.args) > len(argregs) {
-			fmt.Fprintf(os.Stderr, "too many arguments: max %d\n", len(argregs))
+		if len(node.args) > len(argregs64) {
+			fmt.Fprintf(os.Stderr, "too many arguments: max %d\n", len(argregs64))
 			os.Exit(1)
 		}
 		for i := 0; i < len(node.args); i++ {
-			fmt.Printf("	pop %s\n", argregs[i])
+			fmt.Printf("	pop %s\n", argregs64[i])
 		}
 		fmt.Printf("	call %s\n", node.funcname)
 		fmt.Printf("	push rax\n")
@@ -200,7 +209,11 @@ func genFunc(funct *function) {
 		fmt.Printf("	sub rsp, 208\n") // 208 = ('z' - 'a' + 1) * 8
 
 		for i, param := range funct.params {
-			fmt.Printf("	mov [rbp - %d], %s\n", param.offset, argregs[i])
+			if param.ty.size == 4 {
+				fmt.Printf("	mov [rbp - %d], %s\n", param.offset, argregs32[i])
+			} else if param.ty.size == 8 {
+				fmt.Printf("	mov [rbp - %d], %s\n", param.offset, argregs64[i])
+			}
 		}
 
 		// ASTの生成

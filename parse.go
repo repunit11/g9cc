@@ -77,9 +77,9 @@ func alignTo(n, align int) int {
 func stackAllocSize(t *ty) int {
 	switch t.kind {
 	case tyArray:
-		return alignTo(t.arrayLen*8, 8)
+		return alignTo(t.size, 8)
 	default:
-		return 8
+		return t.size
 	}
 }
 
@@ -196,8 +196,8 @@ func (p *parser) funcdef() (*function, error) {
 					return nil, err
 				}
 
-				if len(params) >= len(argregs) {
-					return nil, errorAt(p.input, p.tok.pos, fmt.Sprintf("too many parameters: max %d", len(argregs)))
+				if len(params) >= len(argregs64) {
+					return nil, errorAt(p.input, p.tok.pos, fmt.Sprintf("too many parameters: max %d", len(argregs64)))
 				}
 				params = append(params, lvar)
 
