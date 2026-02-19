@@ -418,27 +418,53 @@ func (p *parser) declarator(ty *ty) (*ty, *token, error) {
 	return ty, tok, nil
 }
 
-// declaration = declspec declarator ";"
+// declaration = declspec (declarator ("=" expr)? ("," declarator ("=" expr)?)*)? ";"
 func (p *parser) declaration() (*node, error) {
-	ty, err := p.declspec()
+	basety, err := p.declspec()
 	if err != nil {
 		return nil, err
 	}
 
-	ty, tok, err := p.declarator(ty)
-	if err != nil {
-		return nil, err
+	head := new(node)
+	cur := head
+	if p.consume(";") {
+		return newNode(ndBlock, head.next, nil), nil
 	}
+	for {
+		ty, tok, err := p.declarator(basety)
+		if err != nil {
+			return nil, err
+		}
 
-	if _, err := p.declareLocal(tok, ty); err != nil {
-		return nil, err
+		lvar, err := p.declareLocal(tok, ty)
+		if err != nil {
+			return nil, err
+		}
+
+		if p.consume("=") {
+			rhs, err := p.expr()
+			if err != nil {
+				return nil, err
+			}
+
+			lhs := newNode(ndVar, nil, nil)
+			lhs.lvar = lvar
+
+			assign := newNode(ndAssign, lhs, rhs)
+			stmt := newNode(ndExprStmt, assign, nil)
+
+			cur.next = stmt
+			cur = cur.next
+		}
+		if !p.consume(",") {
+			break
+		}
 	}
 
 	if err := p.expect(";"); err != nil {
 		return nil, err
 	}
-
-	return newNode(ndBlock, nil, nil), nil
+	return newNode(ndBlock, head.next, nil), nil
 }
 
 // exprStmt = expr ";"
