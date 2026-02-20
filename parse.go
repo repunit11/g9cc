@@ -377,7 +377,7 @@ func (p *parser) declspec() (*ty, error) {
 	return &ty{kind: tyInt, size: 4}, nil
 }
 
-// type-suffix = "[" num "]" | ε
+// type-suffix = "[" num "]" type-suffix | ε
 func (p *parser) typeSuffix(ty *ty) (*ty, error) {
 	if p.consume("[") {
 		sz, err := getNum(p.tok)
@@ -389,6 +389,10 @@ func (p *parser) typeSuffix(ty *ty) (*ty, error) {
 			return nil, err
 		}
 
+		ty, err = p.typeSuffix(ty)
+		if err != nil {
+			return nil, err
+		}
 		return arrayOf(ty, sz), nil
 	}
 
