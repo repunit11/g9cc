@@ -641,7 +641,7 @@ func (p *parser) mul() (*node, error) {
 	}
 }
 
-// unary = ("+" | "-")? unary() | "*" unary | "&" unary | "sizeof" unary()
+// unary = ("+" | "-")? unary() | "*" unary | "&" unary | "sizeof" unary | postfix
 func (p *parser) unary() (*node, error) {
 	if p.consume("+") {
 		return p.unary()
@@ -683,7 +683,33 @@ func (p *parser) unary() (*node, error) {
 		return node, nil
 	}
 
-	return p.primary()
+	return p.postfix()
+}
+
+// postfix = primary ("[" expr "]")*
+func (p *parser) postfix() (*node, error) {
+	node, err := p.primary()
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		if p.consume("[") {
+			rhs, err := p.expr()
+			if err != nil {
+				return nil, err
+			}
+
+			if err = p.expect("]"); err != nil {
+				return nil, err
+			}
+			// x[y] => *(x + y)
+			add := newNode(ndAdd, node, rhs)
+			node = newNode(ndDeref, add, nil)
+			continue
+		}
+		return node, nil
+	}
 }
 
 // primary = "(" expr ")" | number | ident ("(" (assign ("," assign)*)? ")")?

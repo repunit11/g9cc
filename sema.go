@@ -59,6 +59,7 @@ func typeAdd(node *node) error {
 	// num + ptr to ptr + num
 	if lhsTy.kind == tyInt && rhsTy.kind == tyPtr {
 		node.lhs, node.rhs = node.rhs, node.lhs
+		lhsTy, rhsTy = rhsTy, lhsTy
 	}
 
 	// ptr + num
