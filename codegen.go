@@ -199,21 +199,25 @@ func genStmt(node *node) {
 	}
 }
 
-func genFunc(funct *function) {
+func genFunc(funct *obj) {
 	for funct != nil {
-		fmt.Printf("%s:\n", funct.name)
+		fmt.Printf("%s:\n", *funct.name)
 
 		// プロローグ
 		fmt.Printf("	push rbp\n")
 		fmt.Printf("	mov rbp, rsp\n")
 		fmt.Printf("	sub rsp, 208\n") // 208 = ('z' - 'a' + 1) * 8
 
-		for i, param := range funct.params {
+		param := funct.params
+		i := 0
+		for param != nil {
 			if param.ty.size == 4 {
 				fmt.Printf("	mov [rbp - %d], %s\n", param.offset, argregs32[i])
 			} else if param.ty.size == 8 {
 				fmt.Printf("	mov [rbp - %d], %s\n", param.offset, argregs64[i])
 			}
+			param = param.next
+			i++
 		}
 
 		// ASTの生成
@@ -243,7 +247,7 @@ func genAddr(node *node) {
 	fmt.Fprintf(os.Stderr, "not an lvalue")
 }
 
-func codegen(functs *function) {
+func codegen(functs *obj) {
 	// アセンブリの前半部分の出力
 	fmt.Printf(".intel_syntax noprefix\n")
 	fmt.Printf(".text\n")

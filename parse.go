@@ -6,7 +6,7 @@ import (
 
 type parser struct {
 	tok        *token
-	locals     *LVar
+	locals     *obj
 	nextOffset int
 	input      string
 }
@@ -42,7 +42,7 @@ type node struct {
 	next     *node    // 次のnodeのアドレス
 	lhs      *node    // 左子のnodeのアドレス
 	rhs      *node    // 右子のnodeのアドレス
-	lvar     *LVar    // ndVarの時に使用
+	lvar     *obj     // ndVarの時に使用
 	val      int      // ndNumの時に使用
 	cond     *node    // if, forの時
 	then     *node    // if, forの時
@@ -54,21 +54,35 @@ type node struct {
 	ty       *ty      // ポインタを表す型
 }
 
-type function struct {
-	name   string
-	params []*LVar
-	body   *node
-	next   *function
+type obj struct {
+	next       *obj
+	name       *string // Variable name
+	ty         *ty     // type
+	isLocal    bool    // local or global
+	offset     int     // local variable
+	isFunction bool    // global variable or function
+	// function
+	params    *obj
+	body      *node
+	locals    *obj
+	stackSize int
 }
 
+//type function struct {
+//	name   string
+//	params []*LVar
+//	body   *node
+//	next   *function
+//}
+
 // LVar 連結リストで実装しているけど、マップの方が実装は楽そう
-type LVar struct {
-	next   *LVar
-	name   string
-	len    int
-	offset int
-	ty     *ty
-}
+//type LVar struct {
+//	next   *LVar
+//	name   string
+//	len    int
+//	offset int
+//	ty     *ty
+//}
 
 func alignTo(n, align int) int {
 	return (n + align - 1) / align * align
@@ -90,16 +104,15 @@ func getNum(tok *token) (int, error) {
 	return tok.val, nil
 }
 
-func (p *parser) declareLocal(tok *token, ty *ty) (*LVar, error) {
+func (p *parser) declareLocal(tok *token, ty *ty) (*obj, error) {
 	lvar := p.findLVar(tok.str)
 	if lvar != nil {
 		return nil, errorAt(p.input, tok.pos, fmt.Sprintf("%s is already defined", tok.str))
 	}
 	p.nextOffset += stackAllocSize(ty)
-	lvar = &LVar{
+	lvar = &obj{
 		next:   p.locals,
-		name:   tok.str,
-		len:    tok.len,
+		name:   &tok.str,
 		offset: p.nextOffset,
 		ty:     ty,
 	}
@@ -117,9 +130,9 @@ func newNodeNum(val int) *node {
 	return node
 }
 
-func newFunc(name string, params []*LVar, body *node, next *function) *function {
-	funct := &function{
-		name:   name,
+func newFunc(name string, params *obj, body *node, next *obj) *obj {
+	funct := &obj{
+		name:   &name,
 		params: params,
 		body:   body,
 		next:   next,
@@ -152,10 +165,10 @@ func (p *parser) expectNumber() (int, error) {
 	return val, nil
 }
 
-func (p *parser) findLVar(name string) *LVar {
+func (p *parser) findLVar(name string) *obj {
 	cur := p.locals
 	for cur != nil {
-		if cur.name == name {
+		if *cur.name == name {
 			return cur
 		}
 		cur = cur.next
@@ -163,8 +176,20 @@ func (p *parser) findLVar(name string) *LVar {
 	return nil
 }
 
+func reverseObjList(head *obj) *obj {
+	var prev *obj
+	cur := head
+	for cur != nil {
+		next := cur.next
+		cur.next = prev
+		prev = cur
+		cur = next
+	}
+	return prev
+}
+
 // funcdef = declspec ident "(" ( declspec ident ("," declspec ident)*)? ")" stmt
-func (p *parser) funcdef() (*function, error) {
+func (p *parser) funcdef() (*obj, error) {
 	if _, err := p.declspec(); err != nil {
 		return nil, err
 	}
@@ -172,14 +197,14 @@ func (p *parser) funcdef() (*function, error) {
 	p.locals = nil
 	p.nextOffset = 0
 	if p.tok.kind == tkIdent {
-		params := []*LVar{}
-		funct := newFunc(p.tok.str, params, nil, nil)
+		funct := newFunc(p.tok.str, nil, nil, nil)
 		p.tok = p.tok.next
 		if err := p.expect("("); err != nil {
 			return nil, err
 		}
 
 		if p.tok.str != ")" {
+			nparams := 0
 			for {
 				ty, err := p.declspec()
 				if err != nil {
@@ -191,21 +216,22 @@ func (p *parser) funcdef() (*function, error) {
 				tok := p.tok
 				p.tok = p.tok.next
 
-				lvar, err := p.declareLocal(tok, ty)
+				_, err = p.declareLocal(tok, ty)
 				if err != nil {
 					return nil, err
 				}
 
-				if len(params) >= len(argregs64) {
+				if nparams >= len(argregs64) {
 					return nil, errorAt(p.input, p.tok.pos, fmt.Sprintf("too many parameters: max %d", len(argregs64)))
 				}
-				params = append(params, lvar)
+				nparams++
 
 				if !p.consume(",") {
 					break
 				}
 			}
-			funct.params = params
+			funct.params = reverseObjList(p.locals)
+			p.locals = funct.params
 		}
 
 		if err := p.expect(")"); err != nil {
@@ -767,8 +793,8 @@ func (p *parser) primary() (*node, error) {
 	return newNodeNum(num), nil
 }
 
-func (p *parser) parse() (*function, error) {
-	head := new(function)
+func (p *parser) parse() (*obj, error) {
+	head := new(obj)
 	cur := head
 
 	for p.tok.kind != tkEOF {

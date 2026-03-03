@@ -2,7 +2,7 @@ package main
 
 import "fmt"
 
-func sema(prog *function) error {
+func sema(prog *obj) error {
 	for fn := prog; fn != nil; fn = fn.next {
 		if err := addType(fn.body); err != nil {
 			return err
