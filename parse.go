@@ -9,6 +9,7 @@ type parser struct {
 	locals     *obj
 	nextOffset int
 	input      string
+	globals    *obj
 }
 
 type nodeKind int
@@ -68,22 +69,6 @@ type obj struct {
 	stackSize int
 }
 
-//type function struct {
-//	name   string
-//	params []*LVar
-//	body   *node
-//	next   *function
-//}
-
-// LVar 連結リストで実装しているけど、マップの方が実装は楽そう
-//type LVar struct {
-//	next   *LVar
-//	name   string
-//	len    int
-//	offset int
-//	ty     *ty
-//}
-
 func alignTo(n, align int) int {
 	return (n + align - 1) / align * align
 }
@@ -111,10 +96,11 @@ func (p *parser) declareLocal(tok *token, ty *ty) (*obj, error) {
 	}
 	p.nextOffset += stackAllocSize(ty)
 	lvar = &obj{
-		next:   p.locals,
-		name:   &tok.str,
-		offset: p.nextOffset,
-		ty:     ty,
+		next:    p.locals,
+		name:    &tok.str,
+		offset:  p.nextOffset,
+		ty:      ty,
+		isLocal: true,
 	}
 	p.locals = lvar
 	return lvar, nil
@@ -132,10 +118,11 @@ func newNodeNum(val int) *node {
 
 func newFunc(name string, params *obj, body *node, next *obj) *obj {
 	funct := &obj{
-		name:   &name,
-		params: params,
-		body:   body,
-		next:   next,
+		name:       &name,
+		params:     params,
+		body:       body,
+		next:       next,
+		isFunction: true,
 	}
 	return funct
 }
@@ -174,6 +161,29 @@ func (p *parser) findLVar(name string) *obj {
 		cur = cur.next
 	}
 	return nil
+}
+
+func (p *parser) findGVar(name string) *obj {
+	cur := p.globals
+	for cur != nil {
+		if *cur.name == name {
+			return cur
+		}
+		cur = cur.next
+	}
+	return nil
+}
+
+func newVar(name string, ty *ty) *obj {
+	return &obj{name: &name, ty: ty}
+}
+
+func (p *parser) newGVar(name string, ty *ty) *obj {
+	v := newVar(name, ty)
+	v.isLocal = false
+	v.next = p.globals
+	p.globals = v
+	return v
 }
 
 func reverseObjList(head *obj) *obj {
@@ -403,8 +413,30 @@ func (p *parser) declspec() (*ty, error) {
 	return &ty{kind: tyInt, size: 4}, nil
 }
 
-// type-suffix = "[" num "]" type-suffix | ε
+// type-suffix = "(" ( declspec ident ("," declspec ident)*)? ")" | "[" num "]" type-suffix | ε
 func (p *parser) typeSuffix(ty *ty) (*ty, error) {
+	if p.consume("(") {
+		if !p.consume(")") {
+			for {
+				if _, err := p.declspec(); err != nil {
+					return nil, err
+				}
+				if p.tok.kind != tkIdent {
+					return nil, errorAt(p.input, p.tok.pos, "expected identifier")
+				}
+				p.tok = p.tok.next
+
+				if !p.consume(",") {
+					break
+				}
+			}
+			if err := p.expect(")"); err != nil {
+				return nil, err
+			}
+		}
+		return funcType(ty), nil
+	}
+
 	if p.consume("[") {
 		sz, err := getNum(p.tok)
 		if err != nil {
@@ -443,7 +475,7 @@ func (p *parser) declarator(ty *ty) (*ty, *token, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	ty.name = p.tok
+	ty.name = tok
 
 	return ty, tok, nil
 }
@@ -780,7 +812,10 @@ func (p *parser) primary() (*node, error) {
 		}
 		lvar := p.findLVar(name)
 		if lvar == nil {
-			return nil, errorAt(p.input, tok.pos, fmt.Sprintf("undefined variable: %s", name))
+			lvar = p.findGVar(name)
+			if lvar == nil {
+				return nil, errorAt(p.input, tok.pos, fmt.Sprintf("undefined variable: %s", name))
+			}
 		}
 		node := newNode(ndVar, nil, nil)
 		node.lvar = lvar
@@ -793,17 +828,67 @@ func (p *parser) primary() (*node, error) {
 	return newNodeNum(num), nil
 }
 
+func (p *parser) globalVariable() error {
+	basety, err := p.declspec()
+	if err != nil {
+		return err
+	}
+	for {
+		ty, tok, err := p.declarator(basety)
+		if err != nil {
+			return err
+		}
+		p.newGVar(tok.str, ty)
+
+		if !p.consume(",") {
+			break
+		}
+	}
+	return p.expect(";")
+}
+
+func isFunction(tok *token) bool {
+	p := &parser{tok: tok}
+	basety, err := p.declspec()
+	if err != nil {
+		return false
+	}
+	ty, _, err := p.declarator(basety)
+	if err != nil {
+		return false
+	}
+	return ty.kind == tyFunc
+
+}
+
 func (p *parser) parse() (*obj, error) {
 	head := new(obj)
 	cur := head
 
 	for p.tok.kind != tkEOF {
-		n, err := p.funcdef()
-		if err != nil {
+		if isFunction(p.tok) {
+			fn, err := p.funcdef()
+			if err != nil {
+				return nil, err
+			}
+			cur.next = fn
+			cur = cur.next
+			continue
+		}
+
+		if err := p.globalVariable(); err != nil {
 			return nil, err
 		}
-		cur.next = n
+	}
+
+	if head.next == nil {
+		return p.globals, nil
+	}
+
+	prog := head.next
+	for cur.next != nil {
 		cur = cur.next
 	}
-	return head.next, nil
+	cur.next = p.globals
+	return prog, nil
 }
