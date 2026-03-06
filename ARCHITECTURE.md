@@ -1,11 +1,90 @@
-# g9cc Architecture Notes
+# g9cc アーキテクチャ
 
-このファイルは「今どのデータがどこで作られ、どこで使われるか」を追うためのメモです。
+このドキュメントは、現在の `g9cc` 実装がどのような構造で動いているかをまとめたものです。
 
-## 1. 構造図 (class diagram 風)
+## 1. 全体フロー
+
+```mermaid
+flowchart LR
+  A[入力: C風ソース文字列]
+  B[tokenize.go: tokenize]
+  C[parse.go: parser.parse]
+  D[sema.go: sema/addType]
+  E[codegen.go: codegen]
+  F[出力: x86-64 アセンブリ]
+
+  A --> B --> C --> D --> E --> F
+```
+
+### 各段階の役割
+
+- `tokenize`
+  - 入力文字列を `token` の連結リストに変換する
+  - 予約語（`return if else while for int char sizeof`）を分類する
+- `parse`
+  - 再帰下降パーサで AST（`node`）を構築する
+  - 変数・関数シンボル（`obj`）を構築する
+  - 宣言型（`obj.ty`）とローカル変数のオフセットを確定する
+- `sema(addType)`
+  - 式ノードに型（`node.ty`）を付与する
+  - 配列の decay、ポインタ演算のスケーリング、`sizeof` の定数化を行う
+- `codegen`
+  - 型付き AST とシンボル情報から `.data/.text` を出力する
+
+## 2. データ構造
 
 ```mermaid
 classDiagram
+  class tokenKind {
+    <<enumeration>>
+    tkPunct
+    tkReturn
+    tkIf
+    tkElse
+    tkWhile
+    tkFor
+    tkIdent
+    tkInt
+    tkNum
+    tkChar
+    tkSizeof
+    tkEOF
+  }
+
+  class nodeKind {
+    <<enumeration>>
+    ndAdd
+    ndSub
+    ndMul
+    ndDiv
+    ndEq
+    ndNe
+    ndLt
+    ndLe
+    ndAssign
+    ndExprStmt
+    ndVar
+    ndReturn
+    ndIf
+    ndWhile
+    ndFor
+    ndBlock
+    ndFuncall
+    ndAddr
+    ndDeref
+    ndSizeof
+    ndNum
+  }
+
+  class typekind {
+    <<enumeration>>
+    tyInt
+    tyChar
+    tyPtr
+    tyArray
+    tyFunc
+  }
+
   class token {
     +tokenKind kind
     +*token next
@@ -62,139 +141,120 @@ classDiagram
     +int arrayLen
   }
 
-  parser --> token : current
-  parser --> obj : locals/globals
-  node --> node : tree/linked list
-  node --> obj : variable symbol
-  node --> ty : expression type
-  obj --> ty : symbol type
-  obj --> node : function body
+  token --> tokenKind : kind
+  node --> nodeKind : kind
+  ty --> typekind : kind
+
+  parser --> token : 現在トークン
+  parser --> obj : ローカル/グローバル表
+  node --> node : 木/文リスト
+  node --> obj : 参照シンボル
+  node --> ty : 式の型
+  obj --> ty : シンボル型
+  obj --> node : 関数本体
   ty --> ty : base/return
 ```
 
-## 2. 処理フロー図
+## 3. 構文（現在実装）
 
-```mermaid
-flowchart LR
-  A[input source code]
-  B[tokenize]
-  C[parse]
-  D[sema addType]
-  E[codegen]
-  F[assembly .s]
+```text
+program      = (funcdef | global-variable)*
 
- A --> B --> C --> D --> E --> F
+funcdef      = declspec ident "(" (declspec ident ("," declspec ident)*)? ")" stmt
+global-var   = declspec declarator ("," declarator)* ";"
+
+stmt         = exprStmt
+             | "if" "(" expr ")" stmt ("else" stmt)?
+             | "return" expr ";"
+             | "while" "(" expr ")" stmt
+             | "for" "(" expr? ";" expr? ";" expr? ")" stmt
+             | "{" stmt* "}"
+             | declaration
+
+declaration  = declspec (declarator ("=" expr)? ("," declarator ("=" expr)?)*)? ";"
+
+declspec     = "int" | "char"
+declarator   = "*"* ident type-suffix
+type-suffix  = "(" (declspec ident ("," declspec ident)*)? ")"
+             | "[" num "]" type-suffix
+             | ε
+
+exprStmt     = expr? ";"
+expr         = assign
+assign       = equality ("=" assign)?
+equality     = relational (("==" | "!=") relational)*
+relational   = add (("<" | "<=" | ">" | ">=") add)*
+add          = mul (("+" | "-") mul)*
+mul          = unary (("*" | "/") unary)*
+unary        = ("+" | "-") unary
+             | "*" unary
+             | "&" unary
+             | "sizeof" unary
+             | postfix
+postfix      = primary ("[" expr "]")*
+primary      = "(" expr ")"
+             | ident ("(" (assign ("," assign)*)? ")")?
+             | num
 ```
 
-## 3. フィールド解説
+## 4. 型とサイズ
 
-### token
+- `int`: `size=4`
+- `char`: `size=1`
+- `ptr`: `size=8`
+- `array`: `size = base.size * 要素数`
+- `func`: 関数型
 
-- `kind`
-  - トークンの種類（数値、識別子、記号、予約語など）
-- `next`
-  - 次のトークンへのポインタ（連結リスト）
-- `val`
-  - 数値トークンの値（`kind == tkNum` のとき）
-- `str`
-  - トークン文字列そのもの
-- `len`
-  - トークン長（文字数）
-- `pos`
-  - 元入力文字列内の位置（エラー表示用）
+`parse` で宣言型（`obj.ty`）が決まり、`sema` で式型（`node.ty`）が付きます。
 
-### parser
+## 5. 意味解析の要点
 
-- `tok`
-  - 現在読んでいるトークン
-- `locals`
-  - 現在の関数スコープのローカル変数連結リスト
-- `globals`
-  - グローバル変数連結リスト
-- `nextOffset`
-  - 次に割り当てるローカル変数のスタックオフセット
-- `input`
-  - 元の入力文字列（エラーメッセージ生成に使う）
+- `addType` 後、式ノードは `node.ty` を持つ
+- `sizeof` は `ndNum` に畳み込まれる
+- 配列は算術演算時にポインタとして扱う（decay）
+- `+/-` の型付け:
+  - `int/char` 同士は整数演算として扱い、結果は `int`
+  - `ptr +/- int-or-char` は要素サイズを掛けてアドレス計算
+  - `ptr - ptr` は要素数差（`(lhs-rhs)/base.size`）
+- 配列への代入は不可（`not an lvalue`）
 
-### node
+## 6. コード生成の要点（x86-64, Intel記法）
 
-- `kind`
-  - ノード種別（加算、代入、if、return など）
-- `next`
-  - 文リスト（ブロック内）をつなぐ次ノード
-- `lhs`, `rhs`
-  - 二項演算や代入で使う左辺/右辺
-- `lvar`
-  - 変数ノードが参照するシンボル（`obj`）
-- `val`
-  - 数値リテラル値
-- `cond`, `then`, `els`
-  - `if`/`while`/`for` の条件・本体・else
-- `init`, `inc`
-  - `for` の初期化式・更新式
-- `funcname`
-  - 関数呼び出しの関数名
-- `args`
-  - 関数呼び出し引数の AST リスト
-- `ty`
-  - 型解析後に付く式の型
+### ロード/ストア
 
-### obj
+- load:
+  - 8バイト: `mov rax, [rax]`
+  - 4バイト: `mov eax, [rax]`
+  - 1バイト: `movsbq rax, [rax]`
+  - 配列型は load せず、アドレス値として扱う
+- store:
+  - 8バイト: `mov [rax], rdi`
+  - 4バイト: `mov [rax], edi`
+  - 1バイト: `mov [rax], dil`
 
-- `next`
-  - 次のシンボル（連結リスト）
-- `name`
-  - 変数名/関数名
-- `ty`
-  - そのシンボルの型
-- `isLocal`
-  - ローカル変数かどうか
-- `isFunction`
-  - 関数シンボルかどうか
-- `offset`
-  - ローカル変数の `rbp` からのオフセット
-- `params`
-  - 関数パラメータの連結リスト
-- `body`
-  - 関数本体 AST
-- `locals`
-  - その関数が持つローカル変数リスト
-- `stackSize`
-  - 関数が使うスタック領域サイズ（将来拡張向け）
+### 呼び出し規約（実装上の前提）
 
-### ty
+- 引数レジスタ（最大6個）:
+  - 64bit: `rdi rsi rdx rcx r8 r9`
+  - 32bit: `edi esi edx ecx r8d r9d`
+  - 8bit: `dil sil dl cl r8b r9b`
+- 返り値: `rax`
 
-- `kind`
-  - 型種別（`int`, `ptr`, `array`, `func`）
-- `base`
-  - ポインタ/配列の要素型
-- `returnTy`
-  - 関数型の返り値型
-- `name`
-  - 宣言子に対応する識別子トークン（補助情報）
-- `size`
-  - 型サイズ（byte）
-- `arrayLen`
-  - 配列要素数（配列型のとき）
+## 7. ファイルごとの責務
 
-## 4. 各段階で何を確定するか
-
-- `tokenize`
-  - 入力文字列を `token` 連結リストにする
-- `parse`
-  - AST (`node`) を作る
-  - 宣言の型 (`obj.ty`) を確定する
-  - 関数/グローバルを `obj` 連結リストで作る
-- `sema(addType)`
-  - 式ノード (`node`) に型 (`node.ty`) を付ける
-- `codegen`
-  - `obj` と `node` を使って `.data/.text` を出力する
-
-## 5. まず追うと良い最短ルート
-
-1. `int main(){ return 3; }`
-2. `int main(){ int x; x=5; return x; }`
-3. `int x; int main(){ x=5; return x; }`
-4. `int main(){ int a[3]; a[1]=4; return a[1]; }`
-
-各ケースで「parse後の `obj/node`」「sema後の `node.ty`」「codegen出力」の順に見れば、実装の理解がつながりやすいです。
+- `main.go`
+  - `tokenize -> parse -> sema -> codegen` を呼び出す
+- `tokenize.go`
+  - 字句解析
+- `parse.go`
+  - 構文解析、AST構築、シンボル構築
+- `type.go`
+  - 型オブジェクトと型コンストラクタ
+- `sema.go`
+  - 型付け、ポインタ演算の調整
+- `codegen.go`
+  - アセンブリ生成
+- `error.go`
+  - 位置付きエラー表示（`errorAt`）
+- `test.sh`
+  - E2Eテスト

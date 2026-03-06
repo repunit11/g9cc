@@ -398,19 +398,23 @@ func (p *parser) stmt() (*node, error) {
 			node := newNode(ndBlock, head.next, nil)
 			return node, nil
 		}
-	case tkInt:
+	case tkInt, tkChar:
 		return p.declaration()
 	}
 	return p.exprStmt()
 }
 
-// declspec = "int"
+// declspec = "char" | "int"
 func (p *parser) declspec() (*ty, error) {
-	if p.tok.kind != tkInt {
-		return nil, errorAt(p.input, p.tok.pos, "expected type specifier 'int'")
+	if p.tok.kind == tkChar {
+		p.tok = p.tok.next
+		return &ty{kind: tyChar, size: 1}, nil
 	}
-	p.tok = p.tok.next
-	return &ty{kind: tyInt, size: 4}, nil
+	if p.tok.kind == tkInt {
+		p.tok = p.tok.next
+		return &ty{kind: tyInt, size: 4}, nil
+	}
+	return nil, errorAt(p.input, p.tok.pos, "expected type specifier 'int'")
 }
 
 // type-suffix = "(" ( declspec ident ("," declspec ident)*)? ")" | "[" num "]" type-suffix | ε

@@ -8,6 +8,7 @@ import (
 var cntif int
 var argregs64 = []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"}
 var argregs32 = []string{"edi", "esi", "edx", "ecx", "r8d", "r9d"}
+var argregs8 = []string{"dil", "sil", "dl", "cl", "r8b", "r9b"}
 
 func count() int {
 	cntif++
@@ -22,6 +23,8 @@ func load(ty *ty) {
 		fmt.Printf("	mov rax, [rax]\n")
 	} else if ty.size == 4 {
 		fmt.Printf("	mov eax, [rax]\n")
+	} else if ty.size == 1 {
+		fmt.Printf("	movsbq rax, [rax]\n")
 	}
 }
 
@@ -31,6 +34,8 @@ func store(ty *ty) {
 		fmt.Printf("	mov [rax], rdi\n")
 	} else if ty.size == 4 {
 		fmt.Printf("	mov [rax], edi\n")
+	} else if ty.size == 1 {
+		fmt.Printf("	mov [rax], dil\n")
 	}
 }
 
@@ -214,6 +219,8 @@ func genFunc(funct *obj) {
 			fmt.Printf("	mov [rbp - %d], %s\n", param.offset, argregs32[i])
 		} else if param.ty.size == 8 {
 			fmt.Printf("	mov [rbp - %d], %s\n", param.offset, argregs64[i])
+		} else if param.ty.size == 1 {
+			fmt.Printf("	mov [rbp - %d], %s\n", param.offset, argregs8[i])
 		}
 		param = param.next
 		i++

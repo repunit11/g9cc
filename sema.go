@@ -47,23 +47,27 @@ func scalePtrIndex(node *node, ptrTy *ty) error {
 	return nil
 }
 
+func isIntegerType(t *ty) bool {
+	return t.kind == tyInt || t.kind == tyChar
+}
+
 func typeAdd(node *node) error {
 	lhsTy, rhsTy := normalizeArithmeticTypes(node)
 
 	// num + num
-	if lhsTy.kind == tyInt && rhsTy.kind == tyInt {
+	if isIntegerType(lhsTy) && isIntegerType(rhsTy) {
 		node.ty = intType()
 		return nil
 	}
 
 	// num + ptr to ptr + num
-	if lhsTy.kind == tyInt && rhsTy.kind == tyPtr {
+	if isIntegerType(lhsTy) && rhsTy.kind == tyPtr {
 		node.lhs, node.rhs = node.rhs, node.lhs
 		lhsTy, rhsTy = rhsTy, lhsTy
 	}
 
 	// ptr + num
-	if lhsTy.kind == tyPtr && rhsTy.kind == tyInt {
+	if lhsTy.kind == tyPtr && isIntegerType(rhsTy) {
 		if err := scalePtrIndex(node, lhsTy); err != nil {
 			return err
 		}
@@ -85,13 +89,13 @@ func typeSub(node *node) error {
 	}
 
 	// num - num
-	if lhsTy.kind == tyInt && rhsTy.kind == tyInt {
+	if isIntegerType(lhsTy) && isIntegerType(rhsTy) {
 		node.ty = intType()
 		return nil
 	}
 
 	// ptr - num
-	if lhsTy.kind == tyPtr && rhsTy.kind == tyInt {
+	if lhsTy.kind == tyPtr && isIntegerType(rhsTy) {
 		if err := scalePtrIndex(node, lhsTy); err != nil {
 			return err
 		}

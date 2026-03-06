@@ -4,6 +4,7 @@ type typekind int
 
 const (
 	tyInt typekind = iota
+	tyChar
 	tyPtr
 	tyArray
 	tyFunc
