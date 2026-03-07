@@ -21,6 +21,8 @@ flowchart LR
 - `tokenize`
   - 入力文字列を `token` の連結リストに変換する
   - 予約語（`return if else while for int char sizeof`）を分類する
+  - 文字列リテラル（`"..."`）を `tkStr` としてトークン化する
+  - `tkStr.str` には `"` を除いた本文を保持し、未閉じ文字列はエラーにする
 - `parse`
   - 再帰下降パーサで AST（`node`）を構築する
   - 変数・関数シンボル（`obj`）を構築する
@@ -47,6 +49,7 @@ classDiagram
     tkInt
     tkNum
     tkChar
+    tkStr
     tkSizeof
     tkEOF
   }
@@ -100,6 +103,7 @@ classDiagram
     +*obj globals
     +int nextOffset
     +string input
+    +int strSeq
   }
 
   class node {
@@ -126,6 +130,7 @@ classDiagram
     +bool isLocal
     +bool isFunction
     +int offset
+    +*string initData
     +*obj params
     +*node body
     +*obj locals
@@ -194,6 +199,7 @@ unary        = ("+" | "-") unary
 postfix      = primary ("[" expr "]")*
 primary      = "(" expr ")"
              | ident ("(" (assign ("," assign)*)? ")")?
+             | str
              | num
 ```
 
@@ -231,6 +237,12 @@ primary      = "(" expr ")"
   - 8バイト: `mov [rax], rdi`
   - 4バイト: `mov [rax], edi`
   - 1バイト: `mov [rax], dil`
+
+### データセクション
+
+- `emitData` はグローバル変数を `.data` に出力する
+- `initData != nil` のシンボルは `.byte` 列で初期化データを出力する
+- `initData == nil` のシンボルは `.zero size` を出力する
 
 ### 呼び出し規約（実装上の前提）
 
