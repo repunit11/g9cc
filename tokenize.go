@@ -18,6 +18,7 @@ const (
 	tkInt
 	tkNum
 	tkChar
+	tkStr
 	tkSizeof
 	tkEOF
 )
@@ -29,6 +30,7 @@ type token struct {
 	str  string
 	len  int
 	pos  int
+	ty   *ty
 }
 
 var doublePunct = map[string]struct{}{
@@ -92,6 +94,23 @@ func isIdentStart(b byte) bool {
 
 func isIdentCont(b byte) bool {
 	return ('a' <= b && b <= 'z') || ('A' <= b && b <= 'Z') || b == '_' || ('0' <= b && b <= '9')
+}
+
+func scanStringLiteral(s string, i int) (*token, int, bool, error) {
+	if s[i] != '"' {
+		return nil, i, false, nil
+	}
+
+	j := i + 1
+	for j < len(s) && s[j] != '"' {
+		j++
+	}
+	if j >= len(s) {
+		return nil, i, false, errorAt(s, i, "unclosed string literal")
+	}
+
+	lit := s[i+1 : j] // " は含めない
+	return newToken(tkStr, lit, len(lit), i), j + 1, true, nil
 }
 
 func scanIdentOrKeyword(s string, i int) (*token, int, bool) {
@@ -183,6 +202,17 @@ func tokenize(s string) (*token, error) {
 		// 空白の時スキップ
 		if s[i] == ' ' {
 			i++
+			continue
+		}
+
+		// 文字列リテラルのトークン化
+		if tok, next, ok, err := scanStringLiteral(s, i); err != nil {
+			return nil, err
+		} else if ok {
+			if err := appendToken(&cur, tok); err != nil {
+				return nil, err
+			}
+			i = next
 			continue
 		}
 

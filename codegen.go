@@ -264,7 +264,14 @@ func emitData(prog *obj) {
 		}
 		fmt.Printf(".global %s\n", *v.name)
 		fmt.Printf("%s:\n", *v.name)
-		fmt.Printf("	.zero %d\n", v.ty.size)
+		if v.initData != nil {
+			data := *v.initData
+			for i := 0; i < len(data); i++ {
+				fmt.Printf("    .byte %d\n", data[i])
+			}
+		} else {
+			fmt.Printf("    .zero %d\n", v.ty.size)
+		}
 	}
 }
 

@@ -10,6 +10,7 @@ type parser struct {
 	nextOffset int
 	input      string
 	globals    *obj
+	strSeq     int
 }
 
 type nodeKind int
@@ -62,6 +63,7 @@ type obj struct {
 	isLocal    bool    // local or global
 	offset     int     // local variable
 	isFunction bool    // global variable or function
+	initData   *string
 	// function
 	params    *obj
 	body      *node
@@ -183,6 +185,17 @@ func (p *parser) newGVar(name string, ty *ty) *obj {
 	v.isLocal = false
 	v.next = p.globals
 	p.globals = v
+	return v
+}
+
+func (p *parser) newAnonStringLiteral(lit string) *obj {
+	label := fmt.Sprintf(".L..%d", p.strSeq)
+	p.strSeq++
+
+	ty := arrayOf(&ty{kind: tyChar, size: 1}, len(lit)+1)
+	v := p.newGVar(label, ty)
+	data := lit + "\x00"
+	v.initData = &data
 	return v
 }
 
@@ -774,7 +787,7 @@ func (p *parser) postfix() (*node, error) {
 	}
 }
 
-// primary = "(" expr ")" | number | ident ("(" (assign ("," assign)*)? ")")?
+// primary = "(" expr ")" | str | number | ident ("(" (assign ("," assign)*)? ")")?
 func (p *parser) primary() (*node, error) {
 	if p.consume("(") {
 		node, err := p.expr()
@@ -825,6 +838,16 @@ func (p *parser) primary() (*node, error) {
 		node.lvar = lvar
 		return node, nil
 	}
+
+	if p.tok.kind == tkStr {
+		tok := p.tok
+		p.tok = p.tok.next
+		lvar := p.newAnonStringLiteral(tok.str)
+		node := newNode(ndVar, nil, nil)
+		node.lvar = lvar
+		return node, nil
+	}
+
 	num, err := p.expectNumber()
 	if err != nil {
 		return nil, err
