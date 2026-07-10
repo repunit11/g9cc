@@ -256,6 +256,27 @@ func genAddr(node *node) {
 	fmt.Fprintf(os.Stderr, "not an lvalue")
 }
 
+func genPrint() {
+	// Linux x86-64 syscall: write(fd, buf, count)
+	// rax = 1: シスコール番号write, rdi = 1: 標準出力, rsi = 文字列アドレス, rdx = 文字列の長さ.
+	fmt.Printf("print:\n")
+	fmt.Printf("	mov rsi, rdi\n")
+	fmt.Printf("	mov rdx, 0\n")
+
+	fmt.Printf(".Lprint_len:\n")
+	fmt.Printf("	cmp byte ptr [rsi + rdx], 0\n")
+	fmt.Printf("	je .Lprint_write\n")
+	fmt.Printf("	add rdx, 1\n")
+	fmt.Printf("	jmp .Lprint_len\n")
+
+	fmt.Printf(".Lprint_write:\n")
+	fmt.Printf("	mov rax, 1\n")
+	fmt.Printf("	mov rdi, 1\n")
+	fmt.Printf("	syscall\n")
+	fmt.Printf("	mov rax, 0\n")
+	fmt.Printf("	ret\n")
+}
+
 func emitData(prog *obj) {
 	fmt.Printf(".data\n")
 	for v := prog; v != nil; v = v.next {
@@ -285,6 +306,7 @@ func emitText(prog *obj) {
 		fmt.Printf(".global %s\n", *v.name)
 		genFunc(v)
 	}
+	genPrint()
 }
 
 func codegen(prog *obj) {
